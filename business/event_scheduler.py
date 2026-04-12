@@ -44,7 +44,6 @@ class EventScheduler:
         - 每分钟生成状态快照
         """
         self.current_time += 1
-        print(f"\n🕐 仿真时间: t={self.current_time} min")
 
         # 推进所有窗口打饭进度
         for engine in self.queue_engines.values():
