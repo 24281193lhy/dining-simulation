@@ -1,3 +1,4 @@
+# 2.3 座位管理模块
 import random
 
 

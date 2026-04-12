@@ -1,3 +1,5 @@
+# 2.4 用户角色管理
+
 class User:
     def __init__(self, user_id, role='student'):
         self.user_id = user_id
