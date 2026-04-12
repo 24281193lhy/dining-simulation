@@ -1,4 +1,3 @@
-# 2.2 排队与打饭引擎
 from collections import deque
 
 
