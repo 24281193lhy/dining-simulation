@@ -89,7 +89,8 @@ class AdminUI:
                     headers = ["窗口", "类型", "排队人数", "打饭进度", "预计等待(秒)"]
                     rows = []
                     for w in canteen['windows']:
-                        rows.append([w['name'], w['type'], w['queue_len'], f"服务中", w['wait_time']])
+                        progress = "服务中" if w['queue_len'] > 0 else "空闲"
+                        rows.append([w['name'], w['type'], w['queue_len'], progress, w['wait_time']])
                     print_table(headers, rows)
                 time.sleep(1)
         except KeyboardInterrupt:
