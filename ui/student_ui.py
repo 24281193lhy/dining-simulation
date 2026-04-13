@@ -62,22 +62,35 @@ class StudentUI:
         canteens = self.canteen_manager.get_all_canteens_status()
         print_header("食堂实时概况")
         for canteen in canteens:
+            # 根据身份过滤窗口
+            windows = canteen['windows']
+            if self.current_user and self.current_user['type'] == 'student':
+                windows = [w for w in windows if w['type'] != '教工专窗']
+            if not windows:
+                continue  # 学生不显示纯教工食堂
+
             print(f"\n【{canteen['name']}】  空座位数: {canteen['free_seats']}  总排队人数: {canteen['total_queue']}")
             headers = ["窗口ID", "窗口名称", "类型", "排队人数", "预计等待(秒)"]
-            rows = []
-            for win in canteen['windows']:
-                rows.append([win['id'], win['name'], win['type'], win['queue_len'], win['wait_time']])
+            rows = [[w['id'], w['name'], w['type'], w['queue_len'], w['wait_time']] for w in windows]
             print_table(headers, rows)
 
     def join_queue_and_order(self):
         """加入队列并点餐"""
         # 选择食堂
         canteens = self.canteen_manager.get_all_canteens_status()
+
+        # 学生过滤掉纯教工食堂
+        if self.current_user['type'] == 'student':
+            canteens = [
+                c for c in canteens
+                if any(w['type'] != '教工专窗' for w in c['windows'])
+            ]
+
         print("\n可选食堂：")
         for i, c in enumerate(canteens, 1):
             print(f"{i}. {c['name']}")
-        choice = get_user_input("请选择食堂序号：", [str(i) for i in range(1, len(canteens)+1)])
-        selected_canteen = canteens[int(choice)-1]
+        choice = get_user_input("请选择食堂序号：", [str(i) for i in range(1, len(canteens) + 1)])
+        selected_canteen = canteens[int(choice) - 1]
         # 选择窗口（需根据身份过滤教工专窗）
         windows = selected_canteen['windows']
         if self.current_user['type'] == 'student':
@@ -110,13 +123,34 @@ class StudentUI:
                 # 模拟取餐完成
                 time.sleep(1)
             # 打饭完成，分配座位
-            seat = self.seat_manager.assign_seat(self.current_user['id'], selected_canteen['id'])
-            if seat:
-                print_info(f"系统自动为您分配座位：{seat['id']}（{seat['location']}）")
-                self.current_canteen = selected_canteen
+            # 打饭完成，询问是否入座
+            confirm = get_user_input("打饭完成！是否现在入座？(1-自动分配 / 2-手动选座 / 0-暂不入座)：", ["1", "2", "0"])
+            self.current_canteen = selected_canteen
+
+            if confirm == "1":
+                seat = self.seat_manager.assign_seat(self.current_user['id'], selected_canteen['id'])
+                if seat:
+                    print_info(f"已为您分配座位：{seat['id']}（{seat['location']}）")
+                else:
+                    print_warning("暂时没有空闲座位，请稍后手动选座。")
+
+            elif confirm == "2":
+                seats = self.seat_manager.get_free_seats(selected_canteen['id'])
+                if not seats:
+                    print_warning("当前没有空闲座位。")
+                else:
+                    print("\n空闲座位列表：")
+                    for i, seat in enumerate(seats, 1):
+                        print(f"{i}. {seat['id']} - {seat['location']}")
+                    choice = get_user_input("请选择座位序号：", [str(i) for i in range(1, len(seats) + 1)])
+                    selected = seats[int(choice) - 1]
+                    if self.seat_manager.occupy_seat(self.current_user['id'], selected['id']):
+                        print_info(f"您已成功选择座位 {selected['id']}。")
+                    else:
+                        print_error("选座失败，可能已被占用。")
+
             else:
-                print_warning("暂时没有空闲座位，请稍后手动选座。")
-                self.current_canteen = None
+                print_info("您可以稍后通过「手动选座」入座。")
         else:
             print_error(result['message'])
         input("按回车继续...")
