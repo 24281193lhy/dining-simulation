@@ -16,18 +16,18 @@ class QueueEngine:
     def join_queue(self, user):
         """用户加入队列"""
         if not self.window.is_open:
-            print(f"❌ 窗口'{self.window.name}'已关闭，无法排队")
+            #print(f"❌ 窗口'{self.window.name}'已关闭，无法排队")
             return False
         if not self.window.is_accessible_by(user):
-            print(f"❌ {user} 无权使用'{self.window.name}'（教工专窗）")
+            #print(f"❌ {user} 无权使用'{self.window.name}'（教工专窗）")
             return False
         if user in self.queue:
-            print(f"⚠️ {user} 已在队列中")
+            #print(f"⚠️ {user} 已在队列中")
             return False
 
         self.queue.append(user)
-        pos = len(self.queue)
-        print(f"✅ {user} 加入'{self.window.name}'队列，当前排第{pos}位")
+        #pos = len(self.queue)
+        #print(f"✅ {user} 加入'{self.window.name}'队列，当前排第{pos}位")
         return True
 
     def leave_queue(self, user):
@@ -54,30 +54,26 @@ class QueueEngine:
     # ──────────────────────────────
 
     def process_next(self, current_time):
-        """
-        处理队列中下一位用户（打饭完成事件触发时调用）
-        返回：完成打饭的User，或None
-        """
-        # 如果当前有人正在打饭且还没完成，直接返回
         if self.window.serving_user is not None:
             if current_time < self.window.serve_end_time:
                 return None
-
-            # 当前服务完成
             done_user = self.window.serving_user
             self.window.serving_user = None
             self.window.total_served += 1
-            print(f"🍚 {done_user} 在'{self.window.name}'打饭完成（t={current_time}min）")
+            # 不再直接print，改为记录到日志
+            self._log(f"{done_user} 在'{self.window.name}'打饭完成（t={current_time}min）")
 
-        # 取出队列下一位开始打饭
         if self.queue:
             next_user = self.queue.popleft()
             self.window.serving_user = next_user
             self.window.serve_end_time = current_time + self.window.speed
-            print(f"⏳ {next_user} 开始打饭，预计完成时间 t={self.window.serve_end_time}min")
+            self._log(f"{next_user} 开始打饭，预计完成时间 t={self.window.serve_end_time}min")
             return None
-
         return None
+
+    def _log(self, msg):
+        """内部日志，不干扰UI输出"""
+        self._last_log = msg  # 存起来，不print
 
     def tick(self, current_time):
         """每个时间步调用一次，自动推进打饭进度"""
@@ -89,27 +85,23 @@ class QueueEngine:
     # ──────────────────────────────
 
     def estimate_wait_time(self, user=None):
-        """
-        估算等待时间（分钟）
-        - 传入user时：估算该用户还需等多久
-        - 不传入时：估算新加入队尾需等多久
-        """
         speed = self.window.speed
+        current = self.current_time  # 使用当前仿真时间
 
-        # 当前服务剩余时间
-        remaining = max(0, self.window.serve_end_time - self.current_time)
+        # 当前服务剩余时间（分钟）
+        remaining = max(0, self.window.serve_end_time - current)
 
         if user is not None:
             pos = self.get_position(user)
             if pos == -1:
                 return 0
-            # 前面还有 pos-1 人等待 + 当前服务剩余
             return remaining + (pos - 1) * speed
         else:
-            # 新加入队尾
             queue_len = self.queue_length()
-            serving_extra = speed if self.window.serving_user else 0
-            return remaining + queue_len * speed
+            if self.window.serving_user:
+                return remaining + queue_len * speed
+            else:
+                return queue_len * speed
 
     def status_summary(self):
         """打印当前窗口排队状态"""

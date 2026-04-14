@@ -77,6 +77,10 @@ class Canteen:
         self.seats = [Seat(i) for i in range(1, total_seats + 1)]
         self.next_window_id = 1
 
+    def get_accessible_windows(self, user):
+        """返回用户可见的窗口列表"""
+        return [w for w in self.windows.values() if w.is_accessible_by(user)]
+
     def add_window(self, name, speed=1.0, window_type='normal'):
         wid = self.next_window_id
         window = Window(wid, name, speed, window_type)
@@ -119,7 +123,7 @@ class CanteenManager:
         canteen = Canteen(cid, name, total_seats)
         self.canteens[cid] = canteen
         self.next_canteen_id += 1
-        print(f"✅ 食堂'{name}'已添加，ID={cid}")
+        #print(f"✅ 食堂'{name}'已添加，ID={cid}")
         return canteen
 
     def remove_canteen(self, canteen_id):

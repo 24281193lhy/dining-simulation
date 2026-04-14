@@ -32,7 +32,7 @@ class SeatManager:
 
         seat.occupy(user)
         user.current_seat = seat
-        print(f"✅ {user} 入座 → 座位{seat.seat_id}（{self.canteen.name}）")
+        #print(f"✅ {user} 入座 → 座位{seat.seat_id}（{self.canteen.name}）")
         return seat
 
     def assign_specific_seat(self, user, seat_id):

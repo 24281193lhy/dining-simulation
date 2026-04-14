@@ -26,7 +26,7 @@ class EventScheduler:
     def register_queue_engine(self, window_id, queue_engine):
         """注册窗口对应的QueueEngine"""
         self.queue_engines[window_id] = queue_engine
-        print(f"📌 窗口ID={window_id} 的队列引擎已注册")
+        #print(f"📌 窗口ID={window_id} 的队列引擎已注册")
 
     def register_all_windows(self, queue_engine_map):
         """批量注册，queue_engine_map: {window_id: QueueEngine}"""
@@ -38,18 +38,11 @@ class EventScheduler:
     # ──────────────────────────────
 
     def tick(self):
-        """
-        推进一个时间单位（1分钟）
-        - 驱动所有窗口的打饭进度
-        - 每分钟生成状态快照
-        """
         self.current_time += 1
-
-        # 推进所有窗口打饭进度
+        # 把这行注释掉，不在后台打印时间
+        # print(f"\n🕐 仿真时间: t={self.current_time} min")
         for engine in self.queue_engines.values():
             engine.tick(self.current_time)
-
-        # 每分钟生成快照
         self._take_snapshot()
 
     def run(self, duration, real_time_interval=0.5):
@@ -58,8 +51,8 @@ class EventScheduler:
         real_time_interval: 每个tick之间的真实等待秒数（控制演示速度）
         """
         self.is_running = True
-        print(f"▶️  仿真开始，共运行 {duration} 分钟")
-        print("=" * 40)
+        #print(f"▶️  仿真开始，共运行 {duration} 分钟")
+        #print("=" * 40)
 
         try:
             for _ in range(duration):
