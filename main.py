@@ -110,24 +110,36 @@ def main():
                 user = self.um.add_user(user_id, role)
             return {"id": user.user_id, "name": user.user_id, "type": user.role}
 
-        def get_all_canteens_status(self):
+        def get_all_canteens_status(self, user=None):
             result = []
             for cid, canteen in self.cm.canteens.items():
                 total_queue = 0
                 windows_info = []
-                for window in canteen.windows.values():
+
+                # 根据用户身份过滤窗口
+                if user:
+                    visible_windows = canteen.get_accessible_windows(user)
+                else:
+                    visible_windows = list(canteen.windows.values())
+
+                for window in visible_windows:
                     global_id = f"{cid}_{window.window_id}"
                     engine = self.qe.get(global_id)
                     queue_len = engine.queue_length() if engine else 0
                     wait_time = engine.estimate_wait_time() if engine else 0
                     total_queue += queue_len
                     windows_info.append({
-                        "id": global_id,  # 使用全局唯一ID
+                        "id": global_id,
                         "name": window.name,
                         "type": "教工专窗" if window.window_type == 'teacher' else "普通",
                         "queue_len": queue_len,
                         "wait_time": int(wait_time * 60)
                     })
+
+                # 学生不显示纯教工食堂（所有窗口都是教工专窗）
+                if not windows_info:
+                    continue
+
                 free_seats = len(canteen.available_seats())
                 result.append({
                     "id": cid,
