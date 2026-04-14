@@ -229,7 +229,6 @@ def main():
             for cid, canteen in self.cm.canteens.items():
                 windows_info = []
                 for window in canteen.windows.values():
-                    windows_info.append({
                         "id": f"{cid}_{window.window_id}",
                         "name": window.name,
                         "type": "教工专窗" if window.window_type == 'teacher' else "普通",
@@ -270,3 +269,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+                    windows_info.append({
