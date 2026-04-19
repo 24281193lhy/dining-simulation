@@ -1,13 +1,6 @@
 from utils.display import print_error, print_warning, print_header
 
 def get_user_input(prompt, valid_options=None, allow_empty=False):
-    """
-    获取用户输入，并进行有效性验证
-    :param prompt: 提示信息
-    :param valid_options: 可选的有效选项列表（字符串）
-    :param allow_empty: 是否允许空输入
-    :return: 用户输入的字符串（已strip）
-    """
     while True:
         value = input(prompt).strip()
         if not value and not allow_empty:
@@ -19,9 +12,24 @@ def get_user_input(prompt, valid_options=None, allow_empty=False):
         return value
 
 def show_main_menu():
-    """显示主菜单，返回用户选择"""
     print_header("北京交通大学就餐仿真系统")
-    print("1. 学生登录")
+    print("1. 用户登录")
     print("2. 管理员登录")
     print("0. 退出系统")
     return get_user_input("请选择：", ["1", "2", "0"])
+
+def validate_student_id(student_id):
+    """验证北交大学号格式：8位数字，前两位年份20-30，中间两位学院01-30，后四位任意"""
+    if not (student_id.isdigit() and len(student_id) == 8):
+        return False
+    year = int(student_id[:2])
+    if year < 20 or year > 30:
+        return False
+    college = int(student_id[2:4])
+    if college < 1 or college > 30:
+        return False
+    return True
+
+def validate_teacher_id(teacher_id):
+    """验证教师工号格式：以T开头（不区分大小写），后面至少一位数字或字母"""
+    return teacher_id.upper().startswith('T') and len(teacher_id) >= 2

@@ -78,41 +78,46 @@ class EventScheduler:
     # ──────────────────────────────
 
     def _take_snapshot(self):
-        """生成当前时刻的状态快照"""
-        snapshot = {
-            'time': self.current_time,
-            'windows': []
-        }
-
+        """生成当前时刻的状态快照，格式匹配 SimulationStorage.save_snapshot"""
+        windows_status = {}
+        queues_length = {}
         for canteen in self.canteen_manager.canteens.values():
             for window in canteen.windows.values():
-                snapshot['windows'].append({
-                    'canteen': canteen.name,
-                    'window_id': window.window_id,
-                    'window_name': window.name,
-                    'queue_length': window.queue_length(),
-                    'serving_user': str(window.serving_user) if window.serving_user else None,
-                    'total_served': window.total_served
-                })
+                global_id = f"{canteen.canteen_id}_{window.window_id}"
+                windows_status[global_id] = {
+                    "serving": window.serving_user.user_id if window.serving_user else None,
+                    "total_served": window.total_served
+                }
+                queues_length[global_id] = window.queue_length()
 
-        self.snapshots.append(snapshot)
+        seats_status = {}
+        for canteen in self.canteen_manager.canteens.values():
+            seats_status[canteen.canteen_id] = {
+                "total": len(canteen.seats),
+                "occupied": len(canteen.occupied_seats())
+            }
 
-        # 如果有storage模块，写入日志
         if self.storage:
-            self.storage.write_log(snapshot)
+            self.storage.save_snapshot(
+                time=self.current_time,
+                windows_status=windows_status,
+                seats_status=seats_status,
+                queues_length=queues_length
+            )
 
-    def log_event(self, event_type, detail):
-        """
-        记录一条事件日志
-        event_type: 'join_queue' / 'served' / 'seat_taken' / 'leave' 等
-        """
-        entry = {
+        # 保留原有 snapshots 列表（可选）
+        self.snapshots.append({
             'time': self.current_time,
-            'type': event_type,
-            'detail': detail
-        }
-        self.event_log.append(entry)
-        print(f"📝 事件记录 [{event_type}] t={self.current_time}: {detail}")
+            'windows': windows_status,
+            'seats': seats_status,
+            'queues': queues_length
+        })
+
+    def log_event(self, event_type, user_id, detail):
+        if self.storage:
+            self.storage.log_event(event_type, user_id, detail, timestamp=self.current_time)
+        else:
+            print(f"📝 事件记录 [{event_type}] t={self.current_time}: {detail}")
 
     # ──────────────────────────────
     # 统计摘要
