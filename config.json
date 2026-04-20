@@ -1,0 +1,19 @@
+{
+    "simulation": {
+        "duration": 180,
+        "tick_interval": 0.1,
+        "stats_interval": 30,
+        "log_dir": "logs"
+    },
+    "arrival": {
+        "avg_rate": 2.5,
+        "peak_multiplier": 2.5,
+        "peak_hours": [11.5, 12.5]
+    },
+    "decision": {
+        "distance_weight": 0.3,
+        "queue_weight": 0.5,
+        "preference_weight": 0.2,
+        "meal_time_range": [5, 15]
+    }
+}

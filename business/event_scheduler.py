@@ -1,59 +1,60 @@
-# 2.5 事件调度器（时间推进核心）
 import time
-
+import random
 
 class EventScheduler:
-    """
-    仿真时钟核心：
-    - 维护仿真时间（分钟）
-    - 每个tick推进所有窗口的打饭进度
-    - 每分钟生成一次状态快照
-    """
-
     def __init__(self, canteen_manager, storage=None):
-        self.canteen_manager = canteen_manager  # CanteenManager对象
-        self.storage = storage                  # Storage对象（可选，用于写日志）
-        self.current_time = 0                   # 当前仿真时间（分钟）
-        self.queue_engines = {}                 # window_id -> QueueEngine
+        self.canteen_manager = canteen_manager
+        self.storage = storage
+        self.current_time = 0
+        self.queue_engines = {}
         self.is_running = False
-        self.snapshots = []                     # 每分钟状态快照列表
-        self.event_log = []                     # 事件日志
-
-    # ──────────────────────────────
-    # 初始化
-    # ──────────────────────────────
+        self.snapshots = []
+        self.event_log = []
+        self.arrival_callback = None
+        # 新增：打饭完成后的外部回调
+        self.serve_finished_callback = None
 
     def register_queue_engine(self, window_id, queue_engine):
-        """注册窗口对应的QueueEngine"""
         self.queue_engines[window_id] = queue_engine
-        #print(f"📌 窗口ID={window_id} 的队列引擎已注册")
+        # 为每个引擎添加事件监听，以便捕获 serve_finished
+        queue_engine.add_event_listener(self._on_engine_event)
 
     def register_all_windows(self, queue_engine_map):
-        """批量注册，queue_engine_map: {window_id: QueueEngine}"""
         for wid, engine in queue_engine_map.items():
             self.register_queue_engine(wid, engine)
 
-    # ──────────────────────────────
-    # 时间推进
-    # ──────────────────────────────
+    def set_arrival_callback(self, callback):
+        self.arrival_callback = callback
+
+    def set_serve_finished_callback(self, callback):
+        """设置打饭完成后的回调，用于触发占座用餐流程"""
+        self.serve_finished_callback = callback
+
+    def _on_engine_event(self, event):
+        """QueueEngine 产生事件时触发"""
+        if event["type"] == "serve_finished":
+            self.log_event(event["type"], event["user_id"], event["detail"])
+            if self.serve_finished_callback:
+                self.serve_finished_callback(event["user_id"])
 
     def tick(self):
         self.current_time += 1
-        # 把这行注释掉，不在后台打印时间
-        # print(f"\n🕐 仿真时间: t={self.current_time} min")
+
+        if self.arrival_callback:
+            try:
+                arrivals = self.arrival_callback(self.current_time)
+                for item in arrivals:
+                    self.log_event("arrival", item["user_id"], item["detail"])
+            except Exception as e:
+                print(f"⚠️ arrival_callback 失败: {e}")
+
         for engine in self.queue_engines.values():
             engine.tick(self.current_time)
+
         self._take_snapshot()
 
     def run(self, duration, real_time_interval=0.5):
-        """
-        运行仿真，持续 duration 分钟
-        real_time_interval: 每个tick之间的真实等待秒数（控制演示速度）
-        """
         self.is_running = True
-        #print(f"▶️  仿真开始，共运行 {duration} 分钟")
-        #print("=" * 40)
-
         try:
             for _ in range(duration):
                 if not self.is_running:
@@ -62,31 +63,25 @@ class EventScheduler:
                 time.sleep(real_time_interval)
         except KeyboardInterrupt:
             print("\n⏹️  仿真被手动中断")
-
         self.is_running = False
-        print("=" * 40)
         print(f"✅ 仿真结束，共运行 {self.current_time} 分钟")
         self._print_summary()
 
     def stop(self):
-        """手动停止仿真"""
         self.is_running = False
-        print("⏹️  仿真已停止")
-
-    # ──────────────────────────────
-    # 快照与日志
-    # ──────────────────────────────
 
     def _take_snapshot(self):
-        """生成当前时刻的状态快照，格式匹配 SimulationStorage.save_snapshot"""
         windows_status = {}
         queues_length = {}
         for canteen in self.canteen_manager.canteens.values():
             for window in canteen.windows.values():
                 global_id = f"{canteen.canteen_id}_{window.window_id}"
                 windows_status[global_id] = {
+                    "window_id": window.window_id,
+                    "canteen_id": canteen.canteen_id,
                     "serving": window.serving_user.user_id if window.serving_user else None,
-                    "total_served": window.total_served
+                    "total_served": window.total_served,
+                    "queue_length": window.queue_length()
                 }
                 queues_length[global_id] = window.queue_length()
 
@@ -105,43 +100,27 @@ class EventScheduler:
                 queues_length=queues_length
             )
 
-        # 保留原有 snapshots 列表（可选）
         self.snapshots.append({
-            'time': self.current_time,
-            'windows': windows_status,
-            'seats': seats_status,
-            'queues': queues_length
+            "time": self.current_time,
+            "windows": windows_status,
+            "seats": seats_status,
+            "queues": queues_length
         })
 
     def log_event(self, event_type, user_id, detail):
+        record = {
+            "time": self.current_time,
+            "event_type": event_type,
+            "user_id": user_id,
+            "detail": detail
+        }
+        self.event_log.append(record)
         if self.storage:
             self.storage.log_event(event_type, user_id, detail, timestamp=self.current_time)
-        else:
-            print(f"📝 事件记录 [{event_type}] t={self.current_time}: {detail}")
-
-    # ──────────────────────────────
-    # 统计摘要
-    # ──────────────────────────────
 
     def _print_summary(self):
-        """仿真结束后打印统计摘要"""
         print("\n📊 仿真统计摘要")
-        print("=" * 40)
-
         for canteen in self.canteen_manager.canteens.values():
             print(f"\n🏫 {canteen.name}")
             for window in canteen.windows.values():
-                # 从快照中统计该窗口的平均队列长度
-                lengths = [
-                    w['queue_length']
-                    for snap in self.snapshots
-                    for w in snap['windows']
-                    if w['window_id'] == window.window_id
-                ]
-                avg_queue = sum(lengths) / len(lengths) if lengths else 0
-                print(f"  窗口[{window.window_id}] {window.name}")
-                print(f"    累计服务人数: {window.total_served}")
-                print(f"    平均排队人数: {avg_queue:.1f}")
-
-        print(f"\n共记录事件: {len(self.event_log)} 条")
-        print(f"共生成快照: {len(self.snapshots)} 个")
+                print(f"  窗口[{window.window_id}] {window.name}: 服务 {window.total_served} 人")
