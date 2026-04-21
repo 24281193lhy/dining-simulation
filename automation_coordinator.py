@@ -4,6 +4,7 @@ import json
 from collections import defaultdict
 from typing import Dict, List, Optional
 from business.event_scheduler import EventScheduler
+from monitor.web_monitor import push_user_activity
 
 class AutomationCoordinator:
     """自动化仿真协调器，处理用户到达、决策、用餐流程"""
@@ -84,6 +85,12 @@ class AutomationCoordinator:
             # 记录 queue_join 事件供统计使用
             self.storage.log_event("queue_join", user.user_id,
                                    f"加入窗口 {window_id}", timestamp=current_time)
+
+            # 在 arrivals 循环内，获取窗口对象
+            canteen = self.cm.canteens.get(canteen_id)
+            window_obj = canteen.windows.get(window_id) if canteen else None
+            if window_obj:
+                push_user_activity(user.user_id, f"加入 {window_obj.name} 队列", current_time)
 
             arrivals.append({
                 "user_id": user.user_id,
@@ -166,6 +173,9 @@ class AutomationCoordinator:
         return max(score, 0.01)  # 确保得分非负
 
     def on_serve_finished(self, user_id: str):
+        if self.scheduler:
+            self.current_time = self.scheduler.current_time
+
         """打饭完成回调，由 EventScheduler 调用"""
         user = self.um.get_user(user_id)
         if not user:
@@ -199,6 +209,9 @@ class AutomationCoordinator:
         self.storage.log_event("seat_occupy", user_id,
                                f"占用座位 {seat.seat_id}", timestamp=self.current_time)
 
+        window_name = self._get_window_name_by_global_id(window_id)  # 改为 window_id
+        push_user_activity(user_id, f"完成打饭，开始在 {window_name} 用餐", self.current_time)
+
     def tick_post_process(self, current_time: float):
         self.current_time = current_time
         finished = []
@@ -210,6 +223,9 @@ class AutomationCoordinator:
                 self.storage.log_event("seat_release", uid,
                                        f"释放座位 {info['seat'].seat_id}", timestamp=current_time)
                 finished.append(uid)
+
+                push_user_activity(uid, f"用餐结束，离开食堂", current_time)
+
                 # 清理用户状态
                 self.um.clear_user_state(uid)
                 if uid in self.user_target:
@@ -224,3 +240,15 @@ class AutomationCoordinator:
         stats = analyzer.compute_all()
         storage.export_statistics(stats, "final_stats.json")
         return stats
+
+    def _get_window_name_by_global_id(self, global_win_id):
+        """根据 'canteen_id_window_id' 获取窗口名称"""
+        try:
+            c_id, w_id = map(int, global_win_id.split('_'))
+            canteen = self.cm.canteens.get(c_id)
+            if canteen:
+                window = canteen.windows.get(w_id)
+                return window.name if window else "未知窗口"
+        except:
+            pass
+        return "未知窗口"

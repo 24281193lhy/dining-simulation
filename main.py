@@ -15,6 +15,7 @@ from data.storage import SimulationStorage
 from data.statistics import StatisticsAnalyzer
 from utils.display import print_info, print_success, print_error, print_warning
 from automation_coordinator import AutomationCoordinator
+from monitor.web_monitor import start_monitor, push_snapshot
 
 def init_business(storage):
     canteen_manager = CanteenManager()
@@ -98,6 +99,29 @@ def main():
     coordinator.bind_scheduler(scheduler)
     scheduler.set_serve_finished_callback(coordinator.on_serve_finished)
 
+    def _build_snapshot(current_time):
+        windows_data = {}
+        for canteen in canteen_manager.canteens.values():
+            for window in canteen.windows.values():
+                windows_data[window.name] = {
+                    "total_served": window.total_served,
+                    "queue_length": window.queue_length()
+                }
+        from data.statistics import StatisticsAnalyzer
+        analyzer = StatisticsAnalyzer(storage)
+        stats = analyzer.compute_all()
+        result = {
+            "time": current_time,
+            "total_served": stats['total_served'],
+            "avg_wait": stats['avg_wait_time'],
+            "windows": windows_data
+        }
+        print(f"🔧 _build_snapshot 返回: {result['time']}, 窗口名: {list(result['windows'].keys())}")
+        return result
+
+    start_monitor(port=5000)
+    print_info("🌐 实时监测仪表盘已启动，请访问 http://localhost:5000")
+
     print_success("🚀 自动化食堂仿真系统启动")
     print_info(f"⏱️  仿真时长：{duration} 分钟")
     print_info(f"👥 用户总数：{len(user_manager.get_all_users())}")
@@ -107,6 +131,10 @@ def main():
         scheduler.run(duration, real_time_interval=tick_interval)
         # 仿真结束后额外处理一次用餐结束
         coordinator.tick_post_process(scheduler.current_time)
+
+        final_snapshot = _build_snapshot(scheduler.current_time)
+        push_snapshot(final_snapshot)
+
         print_success("\n📊 仿真完成，正在生成统计报告...")
         stats = coordinator.finalize_statistics(storage)
         print_info(f"平均等待时间：{stats['avg_wait_time']:.2f} 分钟")
@@ -118,11 +146,16 @@ def main():
 
     try:
         while sim_thread.is_alive():
+            print(">>> 进入主循环迭代")
             time.sleep(stats_interval)
-            # 在每个统计间隔也调用一次后处理，确保用餐及时释放
             coordinator.tick_post_process(scheduler.current_time)
             analyzer = StatisticsAnalyzer(storage)
             stats = analyzer.compute_all()
+
+            # ✅ 这两行必须存在且缩进正确（在 while 内部）
+            snapshot = _build_snapshot(scheduler.current_time)
+            push_snapshot(snapshot)
+
             print_info(f"[t={scheduler.current_time:.0f}min] "
                        f"已服务 {stats['total_served']} 人，"
                        f"平均等待 {stats['avg_wait_time']:.2f} min")
