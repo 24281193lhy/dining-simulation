@@ -98,35 +98,72 @@ class AutomationCoordinator:
         return random.choice(all_users) if all_users else None
 
     def _decide_canteen_and_window(self, user):
-        best_score = -1
-        best_canteen = None
-        best_window = None
+        """改进后的窗口选择：
+        - 教师用户：强制只选教师专窗，给予极高权重，几乎必选。
+        - 学生用户：根据距离、队列长度、历史偏好按权重随机选择（不含教师专窗）。
+        """
+        candidates = []
+        weights = []
 
         for canteen in self.cm.canteens.values():
             for window in canteen.windows.values():
                 if not window.is_accessible_by(user):
                     continue
+
+                # 教师用户：强制只选教师窗口，且权重极高
+                if user.is_teacher():
+                    if window.window_type == 'teacher':
+                        candidates.append((canteen.canteen_id, window.window_id))
+                        weights.append(100.0)  # 极高权重，确保教师只去教师窗口
+                    continue  # 跳过所有非教师窗口
+
+                # 学生用户：计算得分
                 score = self._calculate_window_score(canteen, window)
-                if score > best_score:
-                    best_score = score
-                    best_canteen = canteen.canteen_id
-                    best_window = window.window_id
-        return best_canteen, best_window
+                if score <= 0:
+                    continue
+
+                # 学生不能选教师专窗（双重保险）
+                if window.window_type == 'teacher':
+                    continue
+
+                candidates.append((canteen.canteen_id, window.window_id))
+                weights.append(score)
+
+        if not candidates:
+            return None, None
+
+        chosen = random.choices(candidates, weights=weights, k=1)[0]
+        return chosen[0], chosen[1]
 
     def _calculate_window_score(self, canteen, window):
+        """计算窗口吸引力得分（改进版）：
+        - 距离得分：拉大食堂间差异，食堂1=1.0，食堂2=0.7，食堂3=0.5
+        - 队列得分：队列越短得分越高
+        - 偏好得分：限制增长上限（最多0.3），避免正反馈垄断
+        - 噪声：±0.05 增加随机性
+        """
         max_queue = 30
         queue_len = min(window.queue_length(), max_queue)
         queue_score = 1.0 - (queue_len / max_queue)
 
-        dist_score = 1.0 / canteen.canteen_id
+        # 距离得分拉大差异
+        dist_map = {1: 1.0, 2: 0.7, 3: 0.5}
+        dist_score = dist_map.get(canteen.canteen_id, 0.3)
 
+        # 偏好得分：基于该窗口历史服务人数，但限制最大值，避免垄断
         global_id = f"{canteen.canteen_id}_{window.window_id}"
         pref_count = self.window_service_count.get(global_id, 0)
-        pref_score = min(pref_count / 10.0, 1.0)
+        pref_score = min(pref_count / 30.0, 0.3)  # 最多贡献0.3
 
-        return (self.dist_weight * dist_score +
-                self.queue_weight * queue_score +
-                self.pref_weight * pref_score)
+        # 小幅随机扰动，增加多样性
+        noise = random.uniform(-0.05, 0.05)
+
+        # 最终得分 = 加权和 + 噪声
+        score = (self.dist_weight * dist_score +
+                 self.queue_weight * queue_score +
+                 self.pref_weight * pref_score +
+                 noise)
+        return max(score, 0.01)  # 确保得分非负
 
     def on_serve_finished(self, user_id: str):
         """打饭完成回调，由 EventScheduler 调用"""

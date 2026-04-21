@@ -27,8 +27,10 @@ class QueueEngine:
 
     def join_queue(self, user):
         if not self.window.is_open:
+            print(f"[警告] 窗口 {self.window.name} 未开放")
             return False
         if not self.window.is_accessible_by(user):
+            print(f"[警告] 用户 {self._uid(user)} 无权访问窗口 {self.window.name}")
             return False
         user_id = self._uid(user)
         if any(self._uid(u) == user_id for u in self.queue):

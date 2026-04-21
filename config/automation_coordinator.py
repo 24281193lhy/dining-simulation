@@ -33,7 +33,6 @@ class AutomationCoordinator:
         self.window_service_count = defaultdict(int)
         self.scheduler: Optional[EventScheduler] = None
 
-        # 用户临时状态存储（因为 User 类没有 target_canteen 属性）
         self.user_target: Dict[str, dict] = {}
 
     def bind_scheduler(self, scheduler: EventScheduler):
@@ -75,13 +74,11 @@ class AutomationCoordinator:
             if not engine.join_queue(user):
                 continue
 
-            # 记录目标食堂窗口
             self.user_target[user.user_id] = {
                 "canteen_id": canteen_id,
                 "window_id": global_win_id
             }
 
-            # 记录 queue_join 事件供统计使用
             self.storage.log_event("queue_join", user.user_id,
                                    f"加入窗口 {window_id}", timestamp=current_time)
 
@@ -98,38 +95,68 @@ class AutomationCoordinator:
         return random.choice(all_users) if all_users else None
 
     def _decide_canteen_and_window(self, user):
-        best_score = -1
-        best_canteen = None
-        best_window = None
+        """改进后的窗口选择：教师必选教师窗口，学生按距离+随机权重选窗口"""
+        candidates = []
+        weights = []
 
         for canteen in self.cm.canteens.values():
             for window in canteen.windows.values():
                 if not window.is_accessible_by(user):
                     continue
+
+                # 教师用户强制只选教师窗口
+                if user.is_teacher():
+                    if window.window_type == 'teacher':
+                        # 教师专窗权重极高
+                        candidates.append((canteen.canteen_id, window.window_id))
+                        weights.append(100.0)
+                    # 忽略非教师窗口
+                    continue
+
+                # 学生用户：计算得分
                 score = self._calculate_window_score(canteen, window)
-                if score > best_score:
-                    best_score = score
-                    best_canteen = canteen.canteen_id
-                    best_window = window.window_id
-        return best_canteen, best_window
+                if score <= 0:
+                    continue
+
+                # 学生不能选教师专窗（已在 is_accessible_by 处理，但双重保险）
+                if window.window_type == 'teacher':
+                    continue
+
+                candidates.append((canteen.canteen_id, window.window_id))
+                weights.append(score)
+
+        if not candidates:
+            return None, None
+
+        # 调试输出（可观察分布）
+        chosen = random.choices(candidates, weights=weights, k=1)[0]
+        # 取消注释以查看选择日志
+        # print(f"[{self.current_time}] 用户 {user.user_id} 选择窗口 {chosen[0]}_{chosen[1]}")
+        return chosen[0], chosen[1]
 
     def _calculate_window_score(self, canteen, window):
         max_queue = 30
         queue_len = min(window.queue_length(), max_queue)
         queue_score = 1.0 - (queue_len / max_queue)
 
-        dist_score = 1.0 / canteen.canteen_id
+        # 拉大距离差异：食堂1=1.0，食堂2=0.7，食堂3=0.5
+        dist_map = {1: 1.0, 2: 0.7, 3: 0.5}
+        dist_score = dist_map.get(canteen.canteen_id, 0.3)
 
         global_id = f"{canteen.canteen_id}_{window.window_id}"
         pref_count = self.window_service_count.get(global_id, 0)
-        pref_score = min(pref_count / 10.0, 1.0)
+        # 降低偏好得分的增长速率，避免垄断
+        pref_score = min(pref_count / 30.0, 0.3)  # 最多贡献0.3
 
+        noise = random.uniform(-0.05, 0.05)
+
+        # 权重配置可在 config.json 中调整
         return (self.dist_weight * dist_score +
                 self.queue_weight * queue_score +
-                self.pref_weight * pref_score)
+                self.pref_weight * pref_score +
+                noise)
 
     def on_serve_finished(self, user_id: str):
-        """打饭完成回调，由 EventScheduler 调用"""
         user = self.um.get_user(user_id)
         if not user:
             return
@@ -148,6 +175,7 @@ class AutomationCoordinator:
 
         seat = seat_mgr.assign_seat(user)
         if not seat:
+            # 无空座，用户离开（静默）
             return
 
         meal_duration = random.uniform(*self.meal_time_range)
@@ -173,7 +201,6 @@ class AutomationCoordinator:
                 self.storage.log_event("seat_release", uid,
                                        f"释放座位 {info['seat'].seat_id}", timestamp=current_time)
                 finished.append(uid)
-                # 清理用户状态
                 self.um.clear_user_state(uid)
                 if uid in self.user_target:
                     del self.user_target[uid]

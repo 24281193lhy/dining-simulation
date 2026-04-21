@@ -36,9 +36,8 @@ class Window:
         return len(self.queue)
 
     def is_accessible_by(self, user):
-        """判断用户是否能使用该窗口"""
-        if self.window_type == 'teacher':
-            return user.is_teacher()
+        if self.window_type == 'teacher' and not user.is_teacher():
+            return False
         return True
 
     def __str__(self):

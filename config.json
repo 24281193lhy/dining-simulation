@@ -11,8 +11,8 @@
         "peak_hours": [11.5, 12.5]
     },
     "decision": {
-        "distance_weight": 0.3,
-        "queue_weight": 0.5,
+        "distance_weight": 0.1,
+        "queue_weight": 0.7,
         "preference_weight": 0.2,
         "meal_time_range": [5, 15]
     }

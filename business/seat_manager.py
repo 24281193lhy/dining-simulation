@@ -21,7 +21,7 @@ class SeatManager:
         available = self.canteen.available_seats()
 
         if not available:
-            print(f"❌ '{self.canteen.name}'已无空余座位")
+            #print(f"❌ '{self.canteen.name}'已无空余座位")
             return None
 
         if strategy == 'random':
@@ -58,12 +58,12 @@ class SeatManager:
         """用户离开，释放座位"""
         seat = user.current_seat
         if seat is None:
-            print(f"⚠️ {user} 当前没有座位")
+            #print(f"⚠️ {user} 当前没有座位")
             return False
 
         seat.release()
         user.current_seat = None
-        print(f"🚶 {user} 离座，座位{seat.seat_id}已释放")
+        #print(f"🚶 {user} 离座，座位{seat.seat_id}已释放")
         return True
 
     def release_seat_by_id(self, seat_id):

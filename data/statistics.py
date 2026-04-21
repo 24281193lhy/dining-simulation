@@ -27,7 +27,7 @@ class StatisticsAnalyzer:
         for event in self.events:
             if event["event_type"] == "queue_join":
                 join_times[event["user_id"]] = event["timestamp"]
-            elif event["event_type"] == "queue_serve_done":
+            elif event["event_type"] == "serve_finished":
                 if event["user_id"] in join_times:
                     wait = event["timestamp"] - join_times[event["user_id"]]
                     wait_times.append(wait)
@@ -65,7 +65,7 @@ class StatisticsAnalyzer:
 
     def total_served(self) -> int:
         """总服务人数（从事件中统计 serve_done）"""
-        return sum(1 for e in self.events if e["event_type"] == "queue_serve_done")
+        return sum(1 for e in self.events if e["event_type"] == "serve_finished")
 
     def average_seat_occupancy(self) -> Dict[int, float]:
         """各食堂平均座位占用率"""
