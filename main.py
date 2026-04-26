@@ -3,6 +3,7 @@ import os
 import threading
 import time
 import json
+import random
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -44,7 +45,16 @@ def init_business(storage):
 
     # ---------- 用户管理器 ----------
     user_manager = UserManager()
-    user_manager.create_users_batch(prefix='S', start=2024001, count=200, role='student')
+    student_ids = set()
+    while len(student_ids) < 200:
+        year = random.randint(22, 25)
+        college = random.randint(1, 50)
+        clazz = random.randint(1, 20)
+        seq = random.randint(0, 99)
+        sid = f"{year:02d}{college:02d}{clazz:02d}{seq:02d}"
+        student_ids.add(sid)
+    for sid in student_ids:
+        user_manager.add_user(sid, role='student')
     for i in range(1, 21):
         user_manager.add_user(f"T{i:03d}", role='teacher')
 
@@ -103,9 +113,12 @@ def main():
         windows_data = {}
         for canteen in canteen_manager.canteens.values():
             for window in canteen.windows.values():
+                global_id = f"{canteen.canteen_id}_{window.window_id}"
+                engine = queue_engines.get(global_id)
+                queue_len = engine.queue_length() if engine else 0
                 windows_data[window.name] = {
                     "total_served": window.total_served,
-                    "queue_length": window.queue_length()
+                    "queue_length": queue_len  # 使用引擎的队列长度
                 }
         from data.statistics import StatisticsAnalyzer
         analyzer = StatisticsAnalyzer(storage)
@@ -116,7 +129,6 @@ def main():
             "avg_wait": stats['avg_wait_time'],
             "windows": windows_data
         }
-        print(f"🔧 _build_snapshot 返回: {result['time']}, 窗口名: {list(result['windows'].keys())}")
         return result
 
     start_monitor(port=5000)

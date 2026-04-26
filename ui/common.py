@@ -19,15 +19,19 @@ def show_main_menu():
     return get_user_input("请选择：", ["1", "2", "0"])
 
 def validate_student_id(student_id):
-    """验证北交大学号格式：8位数字，前两位年份20-30，中间两位学院01-30，后四位任意"""
+    """验证北交大学号格式：8位数字，前两位22-25，3-4位01-50，5-6位01-20，后两位任意"""
     if not (student_id.isdigit() and len(student_id) == 8):
         return False
     year = int(student_id[:2])
-    if year < 20 or year > 30:
+    if year < 22 or year > 25:
         return False
     college = int(student_id[2:4])
-    if college < 1 or college > 30:
+    if college < 1 or college > 50:
         return False
+    clazz = int(student_id[4:6])
+    if clazz < 1 or clazz > 20:
+        return False
+    # 后两位不限制
     return True
 
 def validate_teacher_id(teacher_id):

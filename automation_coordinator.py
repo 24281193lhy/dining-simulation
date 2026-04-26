@@ -100,6 +100,18 @@ class AutomationCoordinator:
 
         return arrivals
 
+    def _decide_canteen_and_window(self, user):
+        # 临时强制选择第一个普通窗口（便于测试队列逻辑）
+        for canteen in self.cm.canteens.values():
+            for window in canteen.windows.values():
+                if window.window_type == 'normal':
+                    return canteen.canteen_id, window.window_id
+        # 如果没有普通窗口，再尝试其他窗口
+        for canteen in self.cm.canteens.values():
+            for window in canteen.windows.values():
+                return canteen.canteen_id, window.window_id
+        return None, None
+
     def _select_random_user(self):
         all_users = self.um.get_all_users()
         return random.choice(all_users) if all_users else None
