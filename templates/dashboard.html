@@ -1,465 +1,298 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🍽️ 北京交通大学食堂仿真</title>
-    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: #f0f2f5;
-            padding: 20px;
-            min-width: 1400px;
-            overflow-x: auto;
-        }
-
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 15px;
-            font-size: 28px;
-        }
-
-        /* 调试面板 */
-        .debug-panel {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            padding: 10px 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: flex;
-            gap: 30px;
-            flex-wrap: wrap;
-            font-size: 14px;
-        }
-
-        /* 统计卡片 */
-        .stats-panel {
-            background: white;
-            padding: 15px 25px;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            margin-bottom: 20px;
-            display: flex;
-            gap: 40px;
-        }
-
-        .stat-item {
-            font-size: 18px;
-        }
-
-        .stat-value {
-            font-weight: bold;
-            color: #e67e22;
-            margin-left: 8px;
-        }
-
-        /* 主内容区：左右两列 */
-        .main-row {
-            display: flex;
-            gap: 20px;
-        }
-
-        .left-column {
-            flex: 7;
-            min-width: 0;
-        }
-
-        .right-column {
-            flex: 3;
-            min-width: 320px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* 图表卡片 */
-        .chart-card {
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-
-        .chart-title {
-            margin-bottom: 10px;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-
-        .chart-container {
-            position: relative;
-            width: 100%;
-            height: 280px;
-        }
-
-        canvas {
-            display: block;
-            width: 100% !important;
-            height: 280px !important;
-        }
-
-        /* 柱状图容器略矮一点 */
-        .bar-chart-container {
-            height: 250px;
-        }
-        .bar-chart-container canvas {
-            height: 250px !important;
-        }
-
-        /* 实时活动面板 */
-        .activity-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .activity-header h3 {
-            color: #2c3e50;
-        }
-
-        .badge {
-            background: #e74c3c;
-            color: white;
-            border-radius: 12px;
-            padding: 2px 10px;
-            font-size: 13px;
-        }
-
-        .activity-feed {
-            flex: 1;
-            overflow-y: auto;
-            max-height: 600px;
-            border: 1px solid #ecf0f1;
-            border-radius: 8px;
-            padding: 10px;
-            background: #fafafa;
-            font-size: 13px;
-        }
-
-        .activity-item {
-            padding: 8px 10px;
-            border-bottom: 1px solid #ecf0f1;
-            line-height: 1.4;
-        }
-
-        .activity-item:last-child {
-            border-bottom: none;
-        }
-
-        .activity-time {
-            color: #7f8c8d;
-            margin-right: 8px;
-            font-family: monospace;
-        }
-
-        .activity-user {
-            font-weight: 600;
-            color: #2980b9;
-        }
-
-        .activity-detail {
-            color: #2c3e50;
-        }
-
-        .error {
-            color: #e74c3c;
-            font-weight: bold;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍽️ 北京交通大学食堂仿真</title>
+<script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; padding: 20px; min-width: 1400px; overflow-x: auto; }
+h1 { color: #2c3e50; margin-bottom: 15px; font-size: 28px; }
+.debug-panel { background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 30px; flex-wrap: wrap; font-size: 14px; }
+.stats-panel { background: white; padding: 15px 25px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; gap: 40px; }
+.stat-item { font-size: 18px; }
+.stat-value { font-weight: bold; color: #e67e22; margin-left: 8px; }
+.control-buttons { margin-bottom: 20px; display: flex; gap: 10px; }
+.control-buttons button { padding: 8px 20px; border: none; border-radius: 5px; color: white; cursor: pointer; font-size: 16px; }
+.control-buttons button:disabled { opacity: 0.5; cursor: not-allowed; }
+.main-row { display: flex; gap: 20px; }
+.left-column { flex: 7; min-width: 0; }
+.right-column { flex: 3; min-width: 320px; background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+.chart-card { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 15px; margin-bottom: 20px; }
+.chart-title { margin-bottom: 10px; font-weight: 600; color: #2c3e50; }
+.chart-container { position: relative; width: 100%; height: 280px; }
+canvas { display: block; width: 100% !important; height: 280px !important; }
+.bar-chart-container { height: 250px; }
+.bar-chart-container canvas { height: 250px !important; }
+.activity-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.activity-header h3 { color: #2c3e50; }
+.badge { background: #e74c3c; color: white; border-radius: 12px; padding: 2px 10px; font-size: 13px; }
+.activity-feed { flex: 1; overflow-y: auto; max-height: 400px; border: 1px solid #ecf0f1; border-radius: 8px; padding: 10px; background: #fafafa; font-size: 13px; }
+.activity-item { padding: 8px 10px; border-bottom: 1px solid #ecf0f1; line-height: 1.4; }
+.activity-time { color: #7f8c8d; margin-right: 8px; font-family: monospace; }
+.activity-user { font-weight: 600; color: #2980b9; }
+.activity-detail { color: #2c3e50; }
+.error { color: #e74c3c; font-weight: bold; }
+.config-panel { border-top: 1px solid #ddd; padding-top: 15px; }
+.config-panel h3, .config-panel h4 { margin-bottom: 10px; }
+.config-panel input, .config-panel select { margin-right: 8px; margin-bottom: 8px; padding: 4px; }
+.config-panel.disabled { opacity: 0.6; pointer-events: none; }
+</style>
 </head>
 <body>
-    <h1>🍽️ 北京交通大学食堂仿真</h1>
-
-    <!-- 调试信息 -->
-    <div class="debug-panel">
-        <div><strong>🔌 Socket:</strong> <span id="conn-status">未连接</span></div>
-        <div><strong>📨 最近数据:</strong> <span id="last-data">暂无</span></div>
-        <div><strong>⚠️ 错误:</strong> <span id="error-msg" class="error">无</span></div>
+<h1>🍽️ 北京交通大学食堂仿真</h1>
+<div class="debug-panel">
+    <div><strong>🔌 Socket:</strong> <span id="conn-status">未连接</span></div>
+    <div><strong>📨 最近数据:</strong> <span id="last-data">暂无</span></div>
+    <div><strong>⚠️ 错误:</strong> <span id="error-msg" class="error">无</span></div>
+</div>
+<div class="stats-panel">
+    <div class="stat-item">⏱️ 当前仿真时间 <span class="stat-value" id="current-time">0</span> 分钟</div>
+    <div class="stat-item">👥 已服务总人数 <span class="stat-value" id="total-served">0</span></div>
+    <div class="stat-item">⏳ 平均等待时间 <span class="stat-value" id="avg-wait">0.00</span> 分钟</div>
+</div>
+<div class="control-buttons">
+    <button id="btn-start" style="background:#2ecc71;">▶ 开始/恢复</button>
+    <button id="btn-pause" style="background:#f39c12;">⏸ 暂停</button>
+    <button id="btn-stop" style="background:#e74c3c;">⏹ 结束</button>
+    <button id="btn-reset" style="background:#3498db;">🔄 重置仿真</button>
+</div>
+<div class="main-row">
+    <div class="left-column">
+        <div class="chart-card"><div class="chart-title">📈 各窗口累计服务人数（历史趋势）</div><div class="chart-container"><canvas id="servedChart"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">🚶 各窗口实时排队长度（历史趋势）</div><div class="chart-container"><canvas id="queueChart"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">📊 当前各窗口状态对比（最新快照）</div><div class="chart-container bar-chart-container"><canvas id="barChart"></canvas></div></div>
     </div>
-
-    <!-- 全局统计 -->
-    <div class="stats-panel">
-        <div class="stat-item">⏱️ 当前仿真时间 <span class="stat-value" id="current-time">0</span> 分钟</div>
-        <div class="stat-item">👥 已服务总人数 <span class="stat-value" id="total-served">0</span></div>
-        <div class="stat-item">⏳ 平均等待时间 <span class="stat-value" id="avg-wait">0.00</span> 分钟</div>
-    </div>
-
-    <!-- 左右两列布局 -->
-    <div class="main-row">
-        <!-- 左侧：折线图 + 柱状图 -->
-        <div class="left-column">
-            <!-- 折线图1：累计服务人数 -->
-            <div class="chart-card">
-                <div class="chart-title">📈 各窗口累计服务人数（历史趋势）</div>
-                <div class="chart-container">
-                    <canvas id="servedChart"></canvas>
-                </div>
-            </div>
-
-            <!-- 折线图2：实时排队长度 -->
-            <div class="chart-card">
-                <div class="chart-title">🚶 各窗口实时排队长度（历史趋势）</div>
-                <div class="chart-container">
-                    <canvas id="queueChart"></canvas>
-                </div>
-            </div>
-
-            <!-- 柱状图：当前时刻各窗口状态对比 -->
-            <div class="chart-card">
-                <div class="chart-title">📊 当前各窗口状态对比（最新快照）</div>
-                <div class="chart-container bar-chart-container">
-                    <canvas id="barChart"></canvas>
-                </div>
-            </div>
+    <div class="right-column">
+        <div>
+            <div class="activity-header"><h3>👤 人员实时流动</h3><span class="badge" id="activity-count">0</span></div>
+            <div class="activity-feed" id="activity-feed"><div class="activity-item">等待数据...</div></div>
         </div>
-
-        <!-- 右侧：实时活动流 -->
-        <div class="right-column">
-            <div class="activity-header">
-                <h3>👤 人员实时流动</h3>
-                <span class="badge" id="activity-count">0</span>
-            </div>
-            <div class="activity-feed" id="activity-feed">
-                <div class="activity-item">等待数据...</div>
+        <div class="config-panel" id="config-panel">
+            <h3>⚙️ 食堂动态配置</h3>
+            <div style="margin-bottom:15px;"><h4>➕ 添加食堂</h4><input type="text" id="canteen-name" placeholder="食堂名称"><input type="number" id="canteen-seats" placeholder="座位数" value="100"><button onclick="addCanteen()">添加</button></div>
+            <div style="margin-bottom:15px;"><h4>➕ 添加窗口</h4><select id="window-canteen-select"></select><input type="text" id="window-name" placeholder="窗口名称"><input type="number" id="window-speed" step="0.1" placeholder="速度(分/人)" value="1.0"><select id="window-type"><option value="normal">普通</option><option value="teacher">教工专窗</option></select><button onclick="addWindow()">添加</button></div>
+            <div><h4>➕ 添加菜品</h4><select id="dish-window-select"></select><input type="text" id="dish-name" placeholder="菜品名称"><input type="number" id="dish-price" step="0.1" placeholder="价格"><button onclick="addDish()">添加</button></div>
+        </div>
+        <!-- 新增：最终统计报表 -->
+        <div class="stats-report" style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 15px;">
+            <h3>📊 最终统计报表</h3>
+            <div id="final-stats">
+                <p class="text-muted">等待仿真结束...</p>
             </div>
         </div>
     </div>
+</div>
+<script>
+(function() {
+    const socket = io();
+    let servedChart, queueChart, barChart;
+    let activityLogs = [];
+    let currentWindowNames = [];
 
-    <script>
-        (function() {
-            const socket = io();
+    // 辅助函数：从后端获取窗口名列表
+    async function fetchWindowNames() {
+        const res = await fetch('/api/windows');
+        const names = await res.json();
+        return names;
+    }
 
-            // DOM 元素
-            const connStatus = document.getElementById('conn-status');
-            const lastDataSpan = document.getElementById('last-data');
-            const errorMsg = document.getElementById('error-msg');
-            const activityFeed = document.getElementById('activity-feed');
-            const activityCountSpan = document.getElementById('activity-count');
+    // 动态初始化/更新图表（完全重建）
+    async function rebuildCharts() {
+        const names = await fetchWindowNames();
+        if (names.length === 0) return;
+        currentWindowNames = names;
+        const colors = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#2c3e50','#95a5a6','#d35400']; // 扩展颜色
+        // 销毁旧图表
+        if (servedChart) servedChart.destroy();
+        if (queueChart) queueChart.destroy();
+        if (barChart) barChart.destroy();
 
-            // 窗口名称（必须与后端一致）
-            const WINDOW_NAMES = ['快餐窗口', '面食窗口', '教工专窗', '普通窗口', '麻辣烫', '铁板饭'];
-            const COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'];
+        const servedCtx = document.getElementById('servedChart').getContext('2d');
+        servedChart = new Chart(servedCtx, {
+            type: 'line',
+            data: { labels: [], datasets: names.map((n,i) => ({ label: n, data: [], borderColor: colors[i%colors.length], backgroundColor: 'transparent', tension: 0.1, borderWidth: 2 })) },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: '仿真时间 (分钟)' } }, y: { beginAtZero: true } } }
+        });
+        const queueCtx = document.getElementById('queueChart').getContext('2d');
+        queueChart = new Chart(queueCtx, {
+            type: 'line',
+            data: { labels: [], datasets: names.map((n,i) => ({ label: n, data: [], borderColor: colors[i%colors.length], backgroundColor: 'transparent', tension: 0.1, borderWidth: 2 })) },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: '仿真时间 (分钟)' } }, y: { beginAtZero: true } } }
+        });
+        const barCtx = document.getElementById('barChart').getContext('2d');
+        barChart = new Chart(barCtx, {
+            type: 'bar',
+            data: { labels: names, datasets: [{ label: '当前排队人数', data: new Array(names.length).fill(0), backgroundColor: '#3498db', borderRadius: 4 }, { label: '累计服务人数', data: new Array(names.length).fill(0), backgroundColor: '#2ecc71', borderRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { position: 'top' } } }
+        });
+    }
 
-            // 图表实例
-            let servedChart, queueChart, barChart;
-            // 活动日志数组（前端缓存）
-            let activityLogs = [];
+    function updateChartsFromSnapshot(data) {
+        if (!servedChart || !queueChart || !barChart) return;
+        // 更新折线图
+        servedChart.data.labels.push(data.time);
+        queueChart.data.labels.push(data.time);
+        currentWindowNames.forEach((name, idx) => {
+            const win = data.windows?.[name];
+            servedChart.data.datasets[idx].data.push(win ? win.total_served : null);
+            queueChart.data.datasets[idx].data.push(win ? win.queue_length : null);
+        });
+        const maxPoints = 80;
+        if (servedChart.data.labels.length > maxPoints) {
+            servedChart.data.labels.shift();
+            servedChart.data.datasets.forEach(ds => ds.data.shift());
+            queueChart.data.labels.shift();
+            queueChart.data.datasets.forEach(ds => ds.data.shift());
+        }
+        servedChart.update();
+        queueChart.update();
+        // 更新柱状图
+        const queueData = [], servedData = [];
+        currentWindowNames.forEach(name => {
+            const win = data.windows?.[name];
+            queueData.push(win ? win.queue_length : 0);
+            servedData.push(win ? win.total_served : 0);
+        });
+        barChart.data.datasets[0].data = queueData;
+        barChart.data.datasets[1].data = servedData;
+        barChart.update();
+    }
 
-            // 初始化折线图
-            function initLineCharts() {
-                const servedCtx = document.getElementById('servedChart').getContext('2d');
-                servedChart = new Chart(servedCtx, {
-                    type: 'line',
-                    data: {
-                        labels: [],
-                        datasets: WINDOW_NAMES.map((name, idx) => ({
-                            label: name,
-                            data: [],
-                            borderColor: COLORS[idx],
-                            backgroundColor: 'transparent',
-                            tension: 0.1,
-                            borderWidth: 2
-                        }))
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            x: { title: { display: true, text: '仿真时间 (分钟)' }, ticks: { maxTicksLimit: 12 } },
-                            y: { beginAtZero: true }
-                        }
-                    }
-                });
+    function addActivityLog(log) {
+        activityLogs.unshift(log);
+        if (activityLogs.length > 100) activityLogs.pop();
+        const container = document.getElementById('activity-feed');
+        if (activityLogs.length === 0) { container.innerHTML = '<div class="activity-item">暂无活动</div>'; return; }
+        container.innerHTML = activityLogs.map(log => `<div class="activity-item"><span class="activity-time">[${log.time}]</span><span class="activity-user">${log.user_id}</span><span class="activity-detail">${log.detail}</span></div>`).join('');
+        document.getElementById('activity-count').innerText = activityLogs.length;
+    }
 
-                const queueCtx = document.getElementById('queueChart').getContext('2d');
-                queueChart = new Chart(queueCtx, {
-                    type: 'line',
-                    data: {
-                        labels: [],
-                        datasets: WINDOW_NAMES.map((name, idx) => ({
-                            label: name,
-                            data: [],
-                            borderColor: COLORS[idx],
-                            backgroundColor: 'transparent',
-                            tension: 0.1,
-                            borderWidth: 2
-                        }))
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            x: { title: { display: true, text: '仿真时间 (分钟)' }, ticks: { maxTicksLimit: 12 } },
-                            y: { beginAtZero: true }
-                        }
-                    }
-                });
+    // 控制仿真状态
+    async function controlSim(action) {
+        const res = await fetch('/api/simulation/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            if (action === 'resume') document.getElementById('config-panel').classList.add('disabled');
+            else if (action === 'pause' || action === 'stop') document.getElementById('config-panel').classList.remove('disabled');
+            if (action === 'stop') {
+                // 停止后可以刷新页面或提示
+                alert('仿真已停止。如需重新开始，请重启程序。');
             }
+        } else {
+            alert('操作失败: ' + data.error);
+        }
+    }
 
-            // 初始化柱状图
-            function initBarChart() {
-                const barCtx = document.getElementById('barChart').getContext('2d');
-                barChart = new Chart(barCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: WINDOW_NAMES,
-                        datasets: [
-                            {
-                                label: '当前排队人数',
-                                data: new Array(WINDOW_NAMES.length).fill(0),
-                                backgroundColor: '#3498db',
-                                borderRadius: 4
-                            },
-                            {
-                                label: '累计服务人数',
-                                data: new Array(WINDOW_NAMES.length).fill(0),
-                                backgroundColor: '#2ecc71',
-                                borderRadius: 4
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: { beginAtZero: true }
-                        },
-                        plugins: {
-                            legend: { position: 'top' }
-                        }
-                    }
-                });
+    document.getElementById('btn-start').onclick = () => controlSim('resume');
+    document.getElementById('btn-pause').onclick = () => controlSim('pause');
+    document.getElementById('btn-stop').onclick = () => controlSim('stop');
+    document.getElementById('btn-reset').onclick = async () => {
+    const res = await fetch('/api/simulation/reset', { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'reset initiated') {
+        alert('仿真已重置，页面将重新加载数据。');
+        location.reload();
+    } else {
+        alert('重置失败：' + (data.error || '未知错误'));
+    }
+};
+
+    // 加载食堂列表
+    async function loadCanteens() {
+        const res = await fetch('/api/canteens');
+        const data = await res.json();
+        let opts = '<option value="">请选择食堂</option>';
+        data.forEach(c => opts += `<option value="${c.id}">${c.name}</option>`);
+        document.getElementById('window-canteen-select').innerHTML = opts;
+        document.getElementById('dish-window-select').innerHTML = opts; // 简化：菜品选择窗口暂用食堂ID
+    }
+
+    window.addCanteen = async function() {
+        const name = document.getElementById('canteen-name').value;
+        const seats = parseInt(document.getElementById('canteen-seats').value);
+        if (!name) { alert('请输入食堂名称'); return; }
+        const res = await fetch('/api/canteen/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, total_seats: seats }) });
+        const data = await res.json();
+        if (data.error) alert('错误: ' + data.error);
+        else { alert(`食堂添加成功，ID: ${data.canteen_id}`); loadCanteens(); await rebuildCharts(); }
+    };
+    window.addWindow = async function() {
+        const canteen_id = parseInt(document.getElementById('window-canteen-select').value);
+        const name = document.getElementById('window-name').value;
+        const speed = parseFloat(document.getElementById('window-speed').value);
+        const window_type = document.getElementById('window-type').value;
+        if (!canteen_id) { alert('请选择食堂'); return; }
+        if (!name) { alert('请输入窗口名称'); return; }
+        const res = await fetch('/api/window/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ canteen_id, name, speed, window_type }) });
+        const data = await res.json();
+        if (data.error) alert('错误: ' + data.error);
+        else { alert(`窗口添加成功，全局ID: ${data.window_global_id}`); await rebuildCharts(); }
+    };
+    window.addDish = async function() {
+        const window_global_id = document.getElementById('dish-window-select').value;
+        const dish_name = document.getElementById('dish-name').value;
+        const price = parseFloat(document.getElementById('dish-price').value);
+        if (!window_global_id) { alert('请选择窗口'); return; }
+        if (!dish_name) { alert('请输入菜品名称'); return; }
+        if (isNaN(price)) { alert('请输入价格'); return; }
+        const res = await fetch('/api/dish/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ window_global_id, dish_name, price }) });
+        const data = await res.json();
+        if (data.error) alert('错误: ' + data.error);
+        else alert('菜品添加成功');
+    };
+
+    // Socket 事件
+    socket.on('connect', () => { document.getElementById('conn-status').innerHTML = '✅ 已连接'; });
+    socket.on('disconnect', () => { document.getElementById('conn-status').innerHTML = '❌ 已断开'; });
+    socket.on('connect_error', (err) => { document.getElementById('error-msg').innerText = '连接失败: ' + err.message; });
+    socket.on('history', async (snapshots) => {
+        await rebuildCharts(); // 确保图表窗口名已更新
+        snapshots.forEach(s => updateChartsFromSnapshot(s));
+    });
+    socket.on('update', (data) => {
+        try { document.getElementById('last-data').innerText = `t=${data.time} | 服务=${data.total_served} | 等待=${data.avg_wait?.toFixed(2)}`; } catch(e) {}
+        updateChartsFromSnapshot(data);
+        document.getElementById('current-time').innerText = data.time;
+        document.getElementById('total-served').innerText = data.total_served;
+        document.getElementById('avg-wait').innerText = data.avg_wait?.toFixed(2) || '0.00';
+        document.getElementById('error-msg').innerText = '无';
+    });
+    socket.on('user_activity', (activity) => addActivityLog(activity));
+
+    socket.on('simulation_end', (stats) => {
+        document.getElementById('summary-total-served').innerText = stats.total_served;
+        document.getElementById('summary-avg-wait').innerText = stats.avg_wait_time.toFixed(2);
+        document.getElementById('summary-occupancy').innerText = stats.avg_seat_occupancy.toFixed(1);
+        document.getElementById('summary-panel').style.display = 'block';
+    });
+
+    socket.on('final_statistics', (stats) => {
+        const container = document.getElementById('final-stats');
+        if (!container) return;
+        let occupancyHtml = '';
+        if (stats.avg_seat_occupancy && typeof stats.avg_seat_occupancy === 'object') {
+            occupancyHtml = '<ul>';
+            for (const [cid, rate] of Object.entries(stats.avg_seat_occupancy)) {
+                occupancyHtml += `<li>食堂 ${cid} 占用率: ${rate.toFixed(1)}%</li>`;
             }
+            occupancyHtml += '</ul>';
+        } else {
+            occupancyHtml = `<p>平均座位占用率: ${(stats.avg_seat_occupancy || 0).toFixed(1)}%</p>`;
+        }
+        container.innerHTML = `
+            <p>⏱️ 平均等待时间: ${stats.avg_wait_time?.toFixed(2) || 0} 分钟</p>
+            <p>👥 总服务人数: ${stats.total_served || 0}</p>
+            ${occupancyHtml}
+        `;
+    });
 
-            // 更新柱状图
-            function updateBarChart(data) {
-                if (!barChart) return;
-                const queueData = [];
-                const servedData = [];
-                WINDOW_NAMES.forEach(name => {
-                    const win = data.windows?.[name];
-                    queueData.push(win ? win.queue_length : 0);
-                    servedData.push(win ? win.total_served : 0);
-                });
-                barChart.data.datasets[0].data = queueData;
-                barChart.data.datasets[1].data = servedData;
-                barChart.update();
-            }
-
-            // 添加活动日志
-            function addActivityLog(log) {
-                activityLogs.unshift(log); // 最新在上
-                if (activityLogs.length > 100) activityLogs.pop();
-                renderActivityFeed();
-                activityCountSpan.innerText = activityLogs.length;
-            }
-
-            function renderActivityFeed() {
-                if (activityLogs.length === 0) {
-                    activityFeed.innerHTML = '<div class="activity-item">暂无活动</div>';
-                    return;
-                }
-                activityFeed.innerHTML = activityLogs.map(log => {
-                    return `<div class="activity-item">
-                        <span class="activity-time">[${log.time}]</span>
-                        <span class="activity-user">${log.user_id}</span>
-                        <span class="activity-detail">${log.detail}</span>
-                    </div>`;
-                }).join('');
-            }
-
-            // 更新折线图
-            function updateLineCharts(data) {
-                if (!servedChart || !queueChart) return;
-
-                servedChart.data.labels.push(data.time);
-                queueChart.data.labels.push(data.time);
-
-                WINDOW_NAMES.forEach((name, idx) => {
-                    const win = data.windows?.[name];
-                    servedChart.data.datasets[idx].data.push(win ? win.total_served : null);
-                    queueChart.data.datasets[idx].data.push(win ? win.queue_length : null);
-                });
-
-                const maxPoints = 80;
-                if (servedChart.data.labels.length > maxPoints) {
-                    servedChart.data.labels.shift();
-                    servedChart.data.datasets.forEach(ds => ds.data.shift());
-                    queueChart.data.labels.shift();
-                    queueChart.data.datasets.forEach(ds => ds.data.shift());
-                }
-
-                servedChart.update();
-                queueChart.update();
-            }
-
-            // Socket 事件
-            socket.on('connect', () => {
-                connStatus.innerText = '✅ 已连接';
-                connStatus.style.color = 'green';
-            });
-
-            socket.on('disconnect', () => {
-                connStatus.innerText = '❌ 已断开';
-                connStatus.style.color = 'red';
-            });
-
-            socket.on('connect_error', (err) => {
-                errorMsg.innerText = '连接失败: ' + err.message;
-            });
-
-            // 接收历史快照
-            socket.on('history', (snapshots) => {
-                snapshots.forEach(s => {
-                    updateLineCharts(s);
-                    updateBarChart(s);
-                });
-            });
-
-            // 接收实时快照更新
-            socket.on('update', (data) => {
-                try {
-                    lastDataSpan.innerText = `t=${data.time} | 服务=${data.total_served} | 等待=${data.avg_wait?.toFixed(2)}`;
-                } catch (e) {
-                    lastDataSpan.innerText = '数据格式异常';
-                }
-
-                updateLineCharts(data);
-                updateBarChart(data);
-
-                document.getElementById('current-time').innerText = data.time;
-                document.getElementById('total-served').innerText = data.total_served;
-                document.getElementById('avg-wait').innerText = data.avg_wait?.toFixed(2) || '0.00';
-
-                errorMsg.innerText = '无';
-            });
-
-            // 接收用户活动事件（需要后端配合推送）
-            socket.on('user_activity', (activity) => {
-                addActivityLog(activity);
-            });
-
-            // 初始化所有图表
-            initLineCharts();
-            initBarChart();
-
-            // 如果后端没有推送活动，这里可以模拟展示示例（可选）
-            // 实际运行时注释掉下面这行
-            // addActivityLog({time: '00:00', user_id: 'SYSTEM', detail: '仿真已启动'});
-        })();
-    </script>
+    // 初始化
+    rebuildCharts();
+    loadCanteens();
+})();
+</script>
 </body>
 </html>

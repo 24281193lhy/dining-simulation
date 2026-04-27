@@ -2,21 +2,21 @@ import time
 import random
 
 class EventScheduler:
+    """仿真时钟核心，支持暂停/恢复"""
     def __init__(self, canteen_manager, storage=None):
         self.canteen_manager = canteen_manager
         self.storage = storage
         self.current_time = 0
         self.queue_engines = {}
         self.is_running = False
+        self.paused = False               # 新增：暂停标志
         self.snapshots = []
         self.event_log = []
         self.arrival_callback = None
-        # 新增：打饭完成后的外部回调
-        self.serve_finished_callback = None
+        self.serve_finished_callback = None   # 打饭完成回调
 
     def register_queue_engine(self, window_id, queue_engine):
         self.queue_engines[window_id] = queue_engine
-        # 为每个引擎添加事件监听，以便捕获 serve_finished
         queue_engine.add_event_listener(self._on_engine_event)
 
     def register_all_windows(self, queue_engine_map):
@@ -27,16 +27,41 @@ class EventScheduler:
         self.arrival_callback = callback
 
     def set_serve_finished_callback(self, callback):
-        """设置打饭完成后的回调，用于触发占座用餐流程"""
         self.serve_finished_callback = callback
 
     def _on_engine_event(self, event):
-        """QueueEngine 产生事件时触发"""
         if event["type"] == "serve_finished":
             self.log_event(event["type"], event["user_id"], event["detail"])
             if self.serve_finished_callback:
                 self.serve_finished_callback(event["user_id"])
 
+    # ========== 控制接口 ==========
+    def pause(self):
+        """暂停仿真"""
+        self.paused = True
+        print("⏸ 仿真已暂停")
+
+    def resume(self):
+        """恢复仿真"""
+        self.paused = False
+        print("▶ 仿真已恢复")
+
+    def stop(self):
+        """停止仿真"""
+        self.is_running = False
+        print("⏹ 仿真已停止")
+
+    # business/event_scheduler.py 中添加
+    def reset(self):
+        """重置调度器内部状态，不重置业务数据（食堂、窗口等）"""
+        self.current_time = 0
+        self.snapshots.clear()
+        self.event_log.clear()
+        self.is_running = False
+        self.paused = False
+        # 注意：不清空 queue_engines，它们关联的 window 对象会被外部重建
+
+    # ========== 时间推进 ==========
     def tick(self):
         self.current_time += 1
 
@@ -54,22 +79,24 @@ class EventScheduler:
         self._take_snapshot()
 
     def run(self, duration, real_time_interval=0.5):
+        """运行仿真，支持暂停"""
         self.is_running = True
+        self.paused = False
         try:
             for _ in range(duration):
                 if not self.is_running:
                     break
+                while self.paused:          # 暂停时等待
+                    time.sleep(0.1)
                 self.tick()
                 time.sleep(real_time_interval)
         except KeyboardInterrupt:
-            print("\n⏹️  仿真被手动中断")
+            print("\n⏹️ 仿真被手动中断")
         self.is_running = False
         print(f"✅ 仿真结束，共运行 {self.current_time} 分钟")
         self._print_summary()
 
-    def stop(self):
-        self.is_running = False
-
+    # ========== 快照与日志 ==========
     def _take_snapshot(self):
         windows_status = {}
         queues_length = {}
