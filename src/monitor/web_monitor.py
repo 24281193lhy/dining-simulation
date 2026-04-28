@@ -180,7 +180,6 @@ def api_get_statistics():
     if _adapter is None:
         return jsonify({'error': 'adapter not ready'}), 500
     # 从存储中获取最终统计
-    from data.statistics import StatisticsAnalyzer
     # 需要访问 storage，但 _adapter 没有直接暴露 storage
     # 简便方法：在 main.py 中设置全局 storage 引用，或通过 _adapter 获取
     # 这里假设我们已经在 main.py 中设置了全局 storage 引用

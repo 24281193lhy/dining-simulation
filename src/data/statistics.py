@@ -1,6 +1,6 @@
 from typing import Dict, List
 from collections import defaultdict
-from data.storage import SimulationStorage
+from src.data.storage import SimulationStorage
 
 class StatisticsAnalyzer:
     """基于存储的事件和快照进行统计分析"""

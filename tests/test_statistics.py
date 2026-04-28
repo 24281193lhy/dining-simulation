@@ -4,8 +4,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import tempfile
 import pytest
-from data.storage import SimulationStorage
-from data.statistics import StatisticsAnalyzer
+from src.data.storage import SimulationStorage
+from src.data.statistics import StatisticsAnalyzer
 
 class TestStatisticsAnalyzer:
     @pytest.fixture

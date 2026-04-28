@@ -6,30 +6,29 @@ import json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from business.canteen_manager import CanteenManager, Dish
-from business.queue_engine import QueueEngine
-from business.seat_manager import SeatManager
-from business.user_manager import UserManager
-from business.event_scheduler import EventScheduler
-from data.storage import SimulationStorage
-from data.statistics import StatisticsAnalyzer
-from utils.display import print_info, print_success, print_error, print_warning
-from automation_coordinator import AutomationCoordinator
-from monitor.web_monitor import start_monitor, push_snapshot, set_adapter, set_scheduler, set_reset_callback
+from src.business.canteen_manager import CanteenManager, Dish
+from src.business.queue_engine import QueueEngine
+from src.business.seat_manager import SeatManager
+from src.business.user_manager import UserManager
+from src.business.event_scheduler import EventScheduler
+from src.data.storage import SimulationStorage
+from utils.display import print_info, print_success, print_warning
+from src.config.automation_coordinator import AutomationCoordinator
+from src.monitor.web_monitor import start_monitor, push_snapshot, set_adapter, set_scheduler, set_reset_callback
 
 # ========== 全局配置 ==========
 SIM_CONFIG = {}
 
 def load_config():
     global SIM_CONFIG
-    with open("config.json", 'r', encoding='utf-8') as f:
+    with open("src/config/config.json", 'r', encoding='utf-8') as f:
         SIM_CONFIG = json.load(f)
     return SIM_CONFIG["simulation"]
 
 # ========== 初始化业务层（食堂、窗口、菜品、用户） ==========
 def init_business(storage):
     canteen_manager = CanteenManager()
-    from business.canteen_manager import Dish
+    from src.business.canteen_manager import Dish
 
     # 学生第一食堂
     c1 = canteen_manager.add_canteen("学生第一食堂", total_seats=120)
@@ -323,7 +322,7 @@ def init_simulation_context():
 
     coordinator = AutomationCoordinator(
         canteen_manager, user_manager, queue_engines, seat_managers, storage,
-        config_path="config.json"
+        config_path="src/config/config.json"
     )
     coordinator.bind_scheduler(scheduler)
     scheduler.set_serve_finished_callback(coordinator.on_serve_finished)
@@ -340,7 +339,7 @@ def init_simulation_context():
                     "total_served": window.total_served,
                     "queue_length": queue_len
                 }
-        from data.statistics import StatisticsAnalyzer
+        from src.data.statistics import StatisticsAnalyzer
         analyzer = StatisticsAnalyzer(storage)
         stats = analyzer.compute_all()
         return {
@@ -373,13 +372,13 @@ def start_simulation_thread(ctx, duration, tick_interval):
         push_snapshot(final_snapshot)
         print_success("\n📊 仿真完成，正在生成统计报告...")
         stats = ctx.coordinator.finalize_statistics(ctx.storage)
-        from monitor.web_monitor import push_final_statistics
+        from src.monitor.web_monitor import push_final_statistics
         push_final_statistics(stats)
         print_success("\n📊 仿真完成，统计结果已发送至前端")
         print_info(f"平均等待时间：{stats['avg_wait_time']:.2f} 分钟")
         print_info(f"总服务人数：{stats['total_served']}")
         print_info(f"平均座位占用率：{stats['avg_seat_occupancy']}")
-        from monitor.web_monitor import push_simulation_summary
+        from src.monitor.web_monitor import push_simulation_summary
         push_simulation_summary(stats)
 
     global sim_thread
@@ -407,7 +406,7 @@ def reset_simulation():
     set_scheduler(new_ctx.scheduler)
     start_simulation_thread(new_ctx, duration, tick_interval)
     current_ctx = new_ctx
-    from monitor.web_monitor import clear_snapshots
+    from src.monitor.web_monitor import clear_snapshots
     clear_snapshots()
     print_success("仿真已重置并重新开始")
 
@@ -445,7 +444,7 @@ def main():
                     current_ctx.coordinator.tick_post_process(current_ctx.scheduler.current_time)
                     snapshot = current_ctx.build_snapshot(current_ctx.scheduler.current_time)
                     push_snapshot(snapshot)
-                    from data.statistics import StatisticsAnalyzer
+                    from src.data.statistics import StatisticsAnalyzer
                     analyzer = StatisticsAnalyzer(current_ctx.storage)
                     stats = analyzer.compute_all()
                     print_info(f"[t={current_ctx.scheduler.current_time:.0f}min] "
