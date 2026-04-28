@@ -6,7 +6,7 @@ from flask_socketio import SocketIO, emit
 import os
 
 # 获取模板文件夹路径
-template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'templates')
+template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'templates')
 app = Flask(__name__, template_folder=template_dir)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
