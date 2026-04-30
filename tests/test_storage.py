@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import json
 import tempfile
 import pytest
-from src.data.storage import SimulationStorage
+from data import SimulationStorage
 
 class TestSimulationStorage:
     @pytest.fixture

@@ -1,6 +1,6 @@
 # ui/admin_ui.py
 from utils.display import clear_screen, print_table, print_info, print_error, print_header, print_warning
-from src.ui.common import get_user_input
+from ui.common import get_user_input
 import time
 
 class AdminUI:

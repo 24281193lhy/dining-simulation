@@ -3,8 +3,8 @@ import math
 import json
 from collections import defaultdict
 from typing import Dict, List, Optional
-from src.business.event_scheduler import EventScheduler
-from src.monitor.web_monitor import push_user_activity
+from business.event_scheduler import EventScheduler
+from monitor.web_monitor import push_user_activity
 
 class AutomationCoordinator:
     """自动化仿真协调器，处理用户到达、决策、用餐流程"""
@@ -247,7 +247,7 @@ class AutomationCoordinator:
             del self.eating_users[uid]
 
     def finalize_statistics(self, storage):
-        from src.data.statistics import StatisticsAnalyzer
+        from data.statistics import StatisticsAnalyzer
         analyzer = StatisticsAnalyzer(storage)
         stats = analyzer.compute_all()
         storage.export_statistics(stats, "final_stats.json")
