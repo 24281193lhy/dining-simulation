@@ -424,10 +424,12 @@ def main():
     set_reset_callback(reset_simulation)
 
     start_simulation_thread(current_ctx, duration, tick_interval)
-    start_monitor(port=5000)
 
     # 启动 Web 监控
     start_monitor(port=5000)
+    import webbrowser
+    webbrowser.open('http://localhost:5000')
+
     print_info("🌐 实时监测仪表盘已启动，请访问 http://localhost:5000")
     print_success("🚀 自动化食堂仿真系统启动")
     print_info(f"⏱️ 仿真时长：{duration} 分钟")
