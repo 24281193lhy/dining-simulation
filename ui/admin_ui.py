@@ -2,13 +2,24 @@
 from utils.display import clear_screen, print_table, print_info, print_error, print_header, print_warning
 from ui.common import get_user_input
 import time
+from data.statistics import StatisticsAnalyzer
+
 
 class AdminUI:
-    def __init__(self, canteen_manager, storage, admin_manager):
-        self.canteen_manager = canteen_manager
+    """管理员命令行界面，依赖 UIAdapter 与调度器"""
+
+    def __init__(self, adapter, storage, scheduler, admin_manager):
+        """
+        :param adapter: UIAdapter 实例（提供所有业务接口）
+        :param storage: SimulationStorage 实例（用于统计分析）
+        :param scheduler: EventScheduler 实例（用于查看运行状态）
+        :param admin_manager: 管理员认证管理器
+        """
+        self.adapter = adapter         # 替代直接使用 canteen_manager
         self.storage = storage
+        self.scheduler = scheduler     # 用于获取仿真状态
         self.admin_manager = admin_manager
-        self.current_admin = None   # 记录当前登录的管理员用户名
+        self.current_admin = None
 
     def login(self):
         """管理员登录验证"""
@@ -26,7 +37,6 @@ class AdminUI:
             return False
 
     def run(self):
-        """管理员主菜单（需要先登录）"""
         if not self.login():
             return
         while True:
@@ -35,7 +45,7 @@ class AdminUI:
             print("1. 食堂与窗口配置")
             print("2. 实时监控（动态刷新）")
             print("3. 查看统计报表")
-            print("4. 修改密码")          # 新增选项
+            print("4. 修改密码")
             print("0. 退出管理员模式")
             choice = get_user_input("请选择：", ["1","2","3","4","0"])
             if choice == "1":
@@ -50,7 +60,6 @@ class AdminUI:
                 break
 
     def change_password(self):
-        """修改密码"""
         print_header("修改密码")
         old_pwd = get_user_input("请输入原密码：", allow_empty=False)
         new_pwd = get_user_input("请输入新密码：", allow_empty=False)
@@ -64,7 +73,6 @@ class AdminUI:
         input("按回车继续...")
 
     def config_menu(self):
-        """配置菜单"""
         while True:
             clear_screen()
             print_header("食堂与窗口配置")
@@ -86,9 +94,13 @@ class AdminUI:
                 break
 
     def view_canteens(self):
-        """查看所有食堂配置"""
-        canteens = self.canteen_manager.get_all_canteens_config()
-        for c in canteens:
+        # 通过 adapter 获取配置
+        config = self.adapter.get_all_canteens_config()
+        if not config:
+            print_warning("暂无食堂配置")
+            input("按回车继续...")
+            return
+        for c in config:
             print(f"\n食堂ID: {c['id']}  名称: {c['name']}  总座位: {c['total_seats']}")
             headers = ["窗口ID", "名称", "类型", "打饭速度(秒/人)", "菜品数"]
             rows = []
@@ -101,19 +113,27 @@ class AdminUI:
         input("按回车继续...")
 
     def edit_canteen(self):
-        """添加新食堂"""
         print_header("添加新食堂")
+        # 检查仿真是否运行且在运行中不可添加
+        if self.scheduler and self.scheduler.is_running and not self.scheduler.paused:
+            print_error("仿真正在运行，请先暂停或停止仿真再添加食堂。")
+            input("按回车返回...")
+            return
         name = get_user_input("请输入食堂名称：", allow_empty=False)
         seats = get_user_input("请输入座位总数（默认100）：", allow_empty=True)
         total_seats = int(seats) if seats.isdigit() else 100
-        canteen_id = self.canteen_manager.add_canteen(name, total_seats)
-        print_info(f"食堂 '{name}' 添加成功，ID={canteen_id}")
+        cid = self.adapter.add_canteen(name, total_seats)
+        print_info(f"食堂 '{name}' 添加成功，ID={cid}")
         input("按回车返回...")
 
     def edit_window(self):
-        """为已有食堂添加新窗口"""
         print_header("添加新窗口")
-        canteens = self.canteen_manager.list_canteens()
+        if self.scheduler and self.scheduler.is_running and not self.scheduler.paused:
+            print_error("仿真正在运行，请先暂停或停止仿真再添加窗口。")
+            input("按回车返回...")
+            return
+        # 列出已有食堂
+        canteens = self.adapter.list_canteens()
         if not canteens:
             print_error("没有食堂，请先添加食堂。")
             input("按回车返回...")
@@ -132,7 +152,7 @@ class AdminUI:
         speed = float(speed_str) if speed_str else 1.0
         win_type = get_user_input("窗口类型（1-普通，2-教工专窗）：", ["1", "2"])
         window_type = "normal" if win_type == "1" else "teacher"
-        global_id = self.canteen_manager.add_window(cid, name, speed, window_type)
+        global_id = self.adapter.add_window(cid, name, speed, window_type)
         if global_id:
             print_info(f"窗口 '{name}' 添加成功，全局ID={global_id}")
         else:
@@ -140,27 +160,31 @@ class AdminUI:
         input("按回车返回...")
 
     def config_dishes(self):
-        """为窗口添加菜品"""
         print_header("配置窗口菜品")
-        # 先列出所有窗口供选择
-        all_windows = self.canteen_manager.get_all_canteens_config()
-        if not all_windows:
+        if self.scheduler and self.scheduler.is_running and not self.scheduler.paused:
+            print_error("仿真正在运行，请先暂停或停止仿真再添加菜品。")
+            input("按回车返回...")
+            return
+        # 获取所有窗口
+        all_canteens = self.adapter.get_all_canteens_config()
+        if not all_canteens:
             print_error("没有食堂和窗口，请先添加。")
             input("按回车返回...")
             return
         print("现有窗口：")
-        for canteen in all_windows:
+        for canteen in all_canteens:
             for win in canteen['windows']:
                 print(f"窗口ID: {win['id']} - {canteen['name']} - {win['name']} (当前菜品: {win['dishes']})")
         win_id = get_user_input("请输入要添加菜品的窗口ID：", allow_empty=False)
         dish_name = get_user_input("请输入菜品名称：", allow_empty=False)
         price_str = get_user_input("请输入价格（元）：", allow_empty=False)
-        if not price_str.replace('.', '').isdigit():
+        try:
+            price = float(price_str)
+        except ValueError:
             print_error("价格必须是数字。")
             input("按回车返回...")
             return
-        price = float(price_str)
-        success = self.canteen_manager.add_dish(win_id, dish_name, price)
+        success = self.adapter.add_dish(win_id, dish_name, price)
         if success:
             print_info(f"菜品 '{dish_name}' 已添加到窗口 {win_id}")
         else:
@@ -168,20 +192,22 @@ class AdminUI:
         input("按回车返回...")
 
     def realtime_monitor(self):
-        """实时监控，每秒刷新显示核心运营数据"""
+        """实时监控，使用 adapter 获取状态"""
         print_header("实时监控（按 Ctrl+C 停止）")
         try:
             while True:
                 clear_screen()
                 print_header("实时运营数据")
-                canteens = self.canteen_manager.get_all_canteens_status()
-                for canteen in canteens:
+                # 获取所有食堂状态（不传入用户，显示全量）
+                statuses = self.adapter.get_all_canteens_status()
+                if not statuses:
+                    print_warning("暂无数据")
+                for canteen in statuses:
                     print(f"\n【{canteen['name']}】 空座位: {canteen['free_seats']}  总排队: {canteen['total_queue']}")
-                    headers = ["窗口", "类型", "排队人数", "打饭进度", "预计等待(秒)"]
+                    headers = ["窗口", "类型", "排队人数", "预计等待(秒)"]
                     rows = []
                     for w in canteen['windows']:
-                        progress = "服务中" if w['queue_len'] > 0 else "空闲"
-                        rows.append([w['name'], w['type'], w['queue_len'], progress, w['wait_time']])
+                        rows.append([w['name'], w['type'], w['queue_len'], w['wait_time']])
                     print_table(headers, rows)
                 time.sleep(1)
         except KeyboardInterrupt:
@@ -189,11 +215,31 @@ class AdminUI:
             input("按回车继续...")
 
     def show_statistics(self):
-        """查看统计报表（从存储层获取）"""
-        stats = self.storage.get_statistics()
+        """从存储中生成并显示统计"""
         print_header("数据统计报表")
-        print(f"平均排队时间: {stats['avg_wait_time']} 秒")
-        print(f"窗口繁忙度: {stats['window_busy_rate']}")
-        print(f"高峰时段: {stats['peak_hours']}")
-        print(f"总服务人数: {stats['total_served']}")
+        try:
+            analyzer = StatisticsAnalyzer(self.storage)
+            stats = analyzer.compute_all()
+            print(f"平均等待时间: {stats['avg_wait_time']:.2f} 分钟")
+            print(f"总服务人数: {stats['total_served']}")
+            # 窗口繁忙率
+            busy = stats.get('window_busy_rate', {})
+            if busy:
+                print("窗口繁忙度（人次/分钟）：")
+                for win_id, rate in busy.items():
+                    print(f"  {win_id}: {rate:.3f}")
+            # 座位占用率
+            seat_occ = stats.get('avg_seat_occupancy', {})
+            if seat_occ:
+                print("食堂平均座位占用率（%）：")
+                for cid, occ in seat_occ.items():
+                    print(f"  食堂 {cid}: {occ:.1f}%")
+            # 高峰时段
+            peaks = stats.get('peak_hours', [])
+            if peaks:
+                print("排队高峰时段：")
+                for p in peaks:
+                    print(f"  {p['start_time']}-{p['end_time']} 分钟，排队人数: {p['queue_length']}")
+        except Exception as e:
+            print_error(f"统计生成失败: {e}")
         input("按回车继续...")

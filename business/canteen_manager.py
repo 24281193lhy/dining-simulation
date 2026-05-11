@@ -36,8 +36,10 @@ class Window:
         return len(self.queue)
 
     def is_accessible_by(self, user):
-        if self.window_type == 'teacher' and not user.is_teacher():
-            return False
+        # 修复：避免依赖可能不存在的 is_teacher() 方法
+        if self.window_type == 'teacher':
+            # 若用户没有 role 属性，默认视为学生（不可访问）
+            return getattr(user, 'role', 'student') == 'teacher'
         return True
 
     def __str__(self):
@@ -122,26 +124,25 @@ class CanteenManager:
         canteen = Canteen(cid, name, total_seats)
         self.canteens[cid] = canteen
         self.next_canteen_id += 1
-        #print(f"✅ 食堂'{name}'已添加，ID={cid}")
         return canteen
 
     def remove_canteen(self, canteen_id):
         if canteen_id in self.canteens:
             name = self.canteens[canteen_id].name
             del self.canteens[canteen_id]
-            print(f"🗑️ 食堂'{name}'已删除")
+            # print(f"🗑️ 食堂'{name}'已删除")
         else:
-            print(f"❌ 未找到食堂ID={canteen_id}")
+            pass  # 避免多余打印干扰 web 接口
 
     def get_canteen(self, canteen_id):
         return self.canteens.get(canteen_id)
 
     def list_canteens(self):
-        if not self.canteens:
-            print("当前没有食堂")
-            return
+        """返回食堂简要信息（供 API 使用，不再使用 print）"""
+        result = []
         for canteen in self.canteens.values():
-            print(canteen)
+            result.append(str(canteen))
+        return result
 
     def get_all_windows(self):
         """获取所有食堂的所有窗口"""

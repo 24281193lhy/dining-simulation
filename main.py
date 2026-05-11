@@ -14,21 +14,36 @@ from business.event_scheduler import EventScheduler
 from data.storage import SimulationStorage
 from utils.display import print_info, print_success, print_warning
 from config.automation_coordinator import AutomationCoordinator
-from monitor.web_monitor import start_monitor, push_snapshot, set_adapter, set_scheduler, set_reset_callback
+from monitor.web_monitor import (
+    start_monitor, push_snapshot, set_adapter, set_scheduler,
+    set_reset_callback, push_final_statistics, push_simulation_summary,
+    clear_snapshots, set_storage, set_auto_exit_callback
+)
 
 # ========== 全局配置 ==========
 SIM_CONFIG = {}
 
 def load_config():
     global SIM_CONFIG
-    with open("config/config.json", 'r', encoding='utf-8') as f:
-        SIM_CONFIG = json.load(f)
+    try:
+        with open("config/config.json", 'r', encoding='utf-8') as f:
+            SIM_CONFIG = json.load(f)
+    except FileNotFoundError:
+        print_warning("配置文件 config/config.json 未找到，使用默认配置。")
+        SIM_CONFIG = {
+            "simulation": {
+                "duration": 120,
+                "tick_interval": 0.5,
+                "stats_interval": 5,
+                "stats_interval_unit": "second"
+            }
+        }
     return SIM_CONFIG["simulation"]
 
-# ========== 初始化业务层（食堂、窗口、菜品、用户） ==========
+
+# ========== 初始化业务层 ==========
 def init_business(storage):
     canteen_manager = CanteenManager()
-    from business.canteen_manager import Dish
 
     # 学生第一食堂
     c1 = canteen_manager.add_canteen("学生第一食堂", total_seats=120)
@@ -54,7 +69,7 @@ def init_business(storage):
     w3_2 = c3.add_window("铁板饭", speed=1.3, window_type='normal')
     w3_2.add_dish(Dish("黑椒牛肉铁板", 18.0))
 
-    # 用户管理器：批量创建学生（学号格式：22-25开头，学院01-50，班级01-20，后两位任意）
+    # 用户管理器
     user_manager = UserManager()
     import random
     existing_ids = set()
@@ -94,7 +109,7 @@ def init_business(storage):
     }
 
 
-# ========== UI适配器（供Web API使用） ==========
+# ========== UI适配器 ==========
 class UIAdapter:
     def __init__(self, canteen_manager, user_manager, queue_engines, seat_managers, scheduler):
         self.cm = canteen_manager
@@ -245,12 +260,8 @@ class UIAdapter:
             return False
         for canteen in self.cm.canteens.values():
             seat_mgr = self.sm.get(canteen.canteen_id)
-            seat = seat_mgr._get_seat(seat_id)
-            if seat:
-                if seat.is_occupied:
-                    return False
-                seat.occupy(user)
-                user.current_seat = seat
+            seat = seat_mgr.assign_specific_seat(user, seat_id)
+            if seat is not None:
                 return True
         return False
 
@@ -287,7 +298,6 @@ class UIAdapter:
 
 # ========== 全局仿真状态管理 ==========
 class SimulationContext:
-    """保存当前仿真的所有组件，支持重置"""
     def __init__(self):
         self.storage = None
         self.canteen_manager = None
@@ -307,11 +317,15 @@ class SimulationContext:
 
 current_ctx = SimulationContext()
 sim_thread = None
+ctx_lock = threading.Lock()
+
+# 用于自动退出的事件
+exit_event = threading.Event()
 
 
 def init_simulation_context():
-    """全新的仿真初始化，返回新的 SimulationContext 对象"""
     storage = SimulationStorage(log_dir="logs")
+    set_storage(storage)
     biz = init_business(storage)
 
     canteen_manager = biz['canteen_manager']
@@ -327,7 +341,6 @@ def init_simulation_context():
     coordinator.bind_scheduler(scheduler)
     scheduler.set_serve_finished_callback(coordinator.on_serve_finished)
 
-    # 构建快照函数
     def _build_snapshot(current_time):
         windows_data = {}
         for canteen in canteen_manager.canteens.values():
@@ -339,9 +352,12 @@ def init_simulation_context():
                     "total_served": window.total_served,
                     "queue_length": queue_len
                 }
-        from data.statistics import StatisticsAnalyzer
-        analyzer = StatisticsAnalyzer(storage)
-        stats = analyzer.compute_all()
+        try:
+            from data.statistics import StatisticsAnalyzer
+            analyzer = StatisticsAnalyzer(storage)
+            stats = analyzer.compute_all()
+        except Exception:
+            stats = {'total_served': 0, 'avg_wait_time': 0}
         return {
             "time": current_time,
             "total_served": stats['total_served'],
@@ -372,14 +388,12 @@ def start_simulation_thread(ctx, duration, tick_interval):
         push_snapshot(final_snapshot)
         print_success("\n📊 仿真完成，正在生成统计报告...")
         stats = ctx.coordinator.finalize_statistics(ctx.storage)
-        from monitor.web_monitor import push_final_statistics
         push_final_statistics(stats)
+        push_simulation_summary(stats)
         print_success("\n📊 仿真完成，统计结果已发送至前端")
         print_info(f"平均等待时间：{stats['avg_wait_time']:.2f} 分钟")
         print_info(f"总服务人数：{stats['total_served']}")
         print_info(f"平均座位占用率：{stats['avg_seat_occupancy']}")
-        from monitor.web_monitor import push_simulation_summary
-        push_simulation_summary(stats)
 
     global sim_thread
     if sim_thread and sim_thread.is_alive():
@@ -396,7 +410,6 @@ def reset_simulation():
     if sim_thread and sim_thread.is_alive():
         sim_thread.join(timeout=2)
 
-    # 重新加载配置
     sim_cfg = load_config()
     duration = sim_cfg["duration"]
     tick_interval = sim_cfg["tick_interval"]
@@ -404,9 +417,10 @@ def reset_simulation():
     new_ctx = init_simulation_context()
     set_adapter(new_ctx.adapter)
     set_scheduler(new_ctx.scheduler)
+
+    with ctx_lock:
+        current_ctx = new_ctx
     start_simulation_thread(new_ctx, duration, tick_interval)
-    current_ctx = new_ctx
-    from monitor.web_monitor import clear_snapshots
     clear_snapshots()
     print_success("仿真已重置并重新开始")
 
@@ -416,17 +430,21 @@ def main():
     sim_cfg = load_config()
     duration = sim_cfg["duration"]
     tick_interval = sim_cfg["tick_interval"]
-    stats_interval = sim_cfg["stats_interval"]
+    stats_interval = sim_cfg.get("stats_interval", 5)
+    if sim_cfg.get("stats_interval_unit") == "minute":
+        stats_interval *= 60
 
     current_ctx = init_simulation_context()
     set_adapter(current_ctx.adapter)
     set_scheduler(current_ctx.scheduler)
     set_reset_callback(reset_simulation)
+    # 注册自动退出回调：当网页全部关闭时触发
+    set_auto_exit_callback(exit_event.set)
 
     start_simulation_thread(current_ctx, duration, tick_interval)
 
-    # 启动 Web 监控
     start_monitor(port=5000)
+
     import webbrowser
     webbrowser.open('http://localhost:5000')
 
@@ -436,30 +454,40 @@ def main():
     print_info(f"👥 用户总数：{len(current_ctx.user_manager.get_all_users())}")
     print_info(f"🍽️ 食堂数量：{len(current_ctx.canteen_manager.canteens)}")
 
-    # 主循环：定期推送快照
+    # 主循环
     try:
-        while True:
-            time.sleep(stats_interval)
-            if current_ctx.scheduler and current_ctx.scheduler.is_running:
-                # 只有在未暂停时才推送快照，更新图表
-                if not current_ctx.scheduler.paused:
-                    current_ctx.coordinator.tick_post_process(current_ctx.scheduler.current_time)
-                    snapshot = current_ctx.build_snapshot(current_ctx.scheduler.current_time)
+        while not exit_event.is_set():      # 检查自动退出信号
+            # 用 wait 代替 sleep，可被立即中断
+            if exit_event.wait(timeout=stats_interval):
+                break
+            with ctx_lock:
+                ctx = current_ctx
+            if ctx.scheduler and ctx.scheduler.is_running:
+                if not ctx.scheduler.paused:
+                    ctx.coordinator.tick_post_process(ctx.scheduler.current_time)
+                    snapshot = ctx.build_snapshot(ctx.scheduler.current_time)
                     push_snapshot(snapshot)
-                    from data.statistics import StatisticsAnalyzer
-                    analyzer = StatisticsAnalyzer(current_ctx.storage)
-                    stats = analyzer.compute_all()
-                    print_info(f"[t={current_ctx.scheduler.current_time:.0f}min] "
-                               f"已服务 {stats['total_served']} 人，"
-                               f"平均等待 {stats['avg_wait_time']:.2f} min")
-                # 可选：如果希望暂停时也打印提示，取消注释下面一行
-                # else:
-                #     print_info("仿真已暂停，等待恢复...")
+                    try:
+                        from data.statistics import StatisticsAnalyzer
+                        analyzer = StatisticsAnalyzer(ctx.storage)
+                        stats = analyzer.compute_all()
+                        print_info(f"[t={ctx.scheduler.current_time:.0f}min] "
+                                   f"已服务 {stats['total_served']} 人，"
+                                   f"平均等待 {stats['avg_wait_time']:.2f} min")
+                    except Exception:
+                        pass
+            else:
+                print_info("仿真已结束，主循环退出。")
+                break
     except KeyboardInterrupt:
         print_warning("\n⏹️ 用户中断，正在停止仿真...")
-        if current_ctx.scheduler:
-            current_ctx.scheduler.stop()
-        if sim_thread:
+    finally:
+        print_warning("正在关闭仿真...")
+        with ctx_lock:
+            ctx = current_ctx
+        if ctx.scheduler:
+            ctx.scheduler.stop()
+        if sim_thread and sim_thread.is_alive():
             sim_thread.join(timeout=2)
         print_success("✅ 仿真系统正常退出")
 
