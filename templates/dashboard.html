@@ -74,7 +74,6 @@ canvas { display: block; width: 100% !important; height: 280px !important; }
             <h3>⚙️ 食堂动态配置</h3>
             <div style="margin-bottom:15px;"><h4>➕ 添加食堂</h4><input type="text" id="canteen-name" placeholder="食堂名称"><input type="number" id="canteen-seats" placeholder="座位数" value="100"><button onclick="addCanteen()">添加</button></div>
             <div style="margin-bottom:15px;"><h4>➕ 添加窗口</h4><select id="window-canteen-select"></select><input type="text" id="window-name" placeholder="窗口名称"><input type="number" id="window-speed" step="0.1" placeholder="速度(分/人)" value="1.0"><select id="window-type"><option value="normal">普通</option><option value="teacher">教工专窗</option></select><button onclick="addWindow()">添加</button></div>
-            <div><h4>➕ 添加菜品</h4><select id="dish-window-select"></select><input type="text" id="dish-name" placeholder="菜品名称"><input type="number" id="dish-price" step="0.1" placeholder="价格"><button onclick="addDish()">添加</button></div>
         </div>
         <!-- 新增：最终统计报表 -->
         <div class="stats-report" style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 15px;">
@@ -207,7 +206,6 @@ canvas { display: block; width: 100% !important; height: 280px !important; }
         let opts = '<option value="">请选择食堂</option>';
         data.forEach(c => opts += `<option value="${c.id}">${c.name}</option>`);
         document.getElementById('window-canteen-select').innerHTML = opts;
-        document.getElementById('dish-window-select').innerHTML = opts; // 简化：菜品选择窗口暂用食堂ID
     }
 
     window.addCanteen = async function() {
