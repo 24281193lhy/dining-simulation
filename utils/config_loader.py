@@ -5,44 +5,72 @@ from typing import Dict, Any
 DEFAULT_CONFIG = {
     "canteens": [
         {
-            "name": "学一食堂",
-            "total_seats": 200,
+            "name": "学生第一食堂",
+            "total_seats": 120,
             "windows": [
-                {"name": "普通窗口1", "speed": 1.5, "type": "normal",
-                 "dishes": ["红烧肉:12", "清炒时蔬:6"]},
-                {"name": "普通窗口2", "speed": 1.5, "type": "normal",
-                 "dishes": ["宫保鸡丁:15", "米饭:1"]},
-                {"name": "教工专窗", "speed": 1.0, "type": "teacher",
-                 "dishes": ["教师特餐:18"]}
+                {
+                    "name": "快餐窗口",
+                    "speed": 0.8,
+                    "type": "normal",
+                    "dishes": ["红烧肉套餐:15.0", "宫保鸡丁:12.0"]
+                },
+                {
+                    "name": "面食窗口",
+                    "speed": 1.2,
+                    "type": "normal",
+                    "dishes": ["牛肉拉面:12.0", "炸酱面:10.0"]
+                }
             ]
         },
         {
-            "name": "学二食堂",
-            "total_seats": 150,
-            "windows": [
-                {"name": "普通窗口1", "speed": 1.2, "type": "normal",
-                 "dishes": ["牛肉面:20"]},
-                {"name": "普通窗口2", "speed": 1.2, "type": "normal",
-                 "dishes": ["饺子:15"]}
-            ]
-        },
-        {
-            "name": "教工餐厅",
+            "name": "教工食堂",
             "total_seats": 80,
             "windows": [
-                {"name": "教工专窗", "speed": 0.8, "type": "teacher",
-                 "dishes": ["教工套餐:25"]}
+                {
+                    "name": "教工专窗",
+                    "speed": 1.0,
+                    "type": "teacher",
+                    "dishes": ["教师套餐A:18.0", "教师套餐B:20.0"]
+                },
+                {
+                    "name": "普通窗口",
+                    "speed": 1.0,
+                    "type": "normal",
+                    "dishes": ["盖浇饭:13.0"]
+                }
+            ]
+        },
+        {
+            "name": "风味餐厅",
+            "total_seats": 100,
+            "windows": [
+                {
+                    "name": "麻辣烫",
+                    "speed": 1.5,
+                    "type": "normal",
+                    "dishes": ["自选麻辣烫:16.0"]
+                },
+                {
+                    "name": "铁板饭",
+                    "speed": 1.3,
+                    "type": "normal",
+                    "dishes": ["黑椒牛肉铁板:18.0"]
+                }
             ]
         }
     ],
     "users": [
-        {"id": "S2024001", "role": "student"},
-        {"id": "T001", "role": "teacher"}
-    ]
+        # 批量创建逻辑在代码中实现，这里不列出具体ID
+    ],
+    "user_generation": {
+        "students": 200,
+        "teachers": 20
+    }
 }
 
+
 class ConfigLoader:
-    """加载/保存 JSON 配置文件，若不存在则生成默认配置"""
+    """加载/保存 JSON 配置文件，若不存在则生成与 main.py 一致的默认配置"""
 
     def __init__(self, config_path: str = "config/canteen_config.json"):
         self.config_path = config_path
@@ -52,8 +80,14 @@ class ConfigLoader:
         if not os.path.exists(self.config_path):
             print(f"⚠️ 配置文件 {self.config_path} 不存在，将创建默认配置")
             self.save_default()
-        with open(self.config_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"❌ 配置文件读取失败: {e}，将使用默认配置并覆盖原文件")
+            self.save_default()
+            config = DEFAULT_CONFIG
+        return config
 
     def save_default(self):
         with open(self.config_path, 'w', encoding='utf-8') as f:

@@ -1,3 +1,4 @@
+import re
 from utils.display import print_error, print_warning, print_header
 
 def get_user_input(prompt, valid_options=None, allow_empty=False):
@@ -31,9 +32,11 @@ def validate_student_id(student_id):
     clazz = int(student_id[4:6])
     if clazz < 1 or clazz > 20:
         return False
-    # 后两位不限制
     return True
 
 def validate_teacher_id(teacher_id):
-    """验证教师工号格式：以T开头（不区分大小写），后面至少一位数字或字母"""
-    return teacher_id.upper().startswith('T') and len(teacher_id) >= 2
+    """
+    验证教师工号格式：以 T 开头，后跟至少 3 位数字（如 T001、T1001）
+    与系统 UserManager 的验证规则保持一致
+    """
+    return bool(re.fullmatch(r"T\d{3,}", teacher_id, re.IGNORECASE))

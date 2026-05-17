@@ -9,11 +9,11 @@ class EventScheduler:
         self.current_time = 0
         self.queue_engines = {}
         self.is_running = False
-        self.paused = False               # 新增：暂停标志
+        self.paused = False
         self.snapshots = []
         self.event_log = []
         self.arrival_callback = None
-        self.serve_finished_callback = None   # 打饭完成回调
+        self.serve_finished_callback = None
 
     def register_queue_engine(self, window_id, queue_engine):
         self.queue_engines[window_id] = queue_engine
@@ -37,29 +37,27 @@ class EventScheduler:
 
     # ========== 控制接口 ==========
     def pause(self):
-        """暂停仿真"""
         self.paused = True
-        print("⏸ 仿真已暂停")
+        # print 语句在 web 后台可能刷屏，建议注释或改用 logging
+        # print("⏸ 仿真已暂停")
 
     def resume(self):
-        """恢复仿真"""
         self.paused = False
-        print("▶ 仿真已恢复")
+        # print("▶ 仿真已恢复")
 
     def stop(self):
-        """停止仿真"""
         self.is_running = False
-        print("⏹ 仿真已停止")
+        self.paused = False      # 【修复 Bug 1】确保暂停循环能退出
+        # print("⏹ 仿真已停止")
 
-    # business/event_scheduler.py 中添加
     def reset(self):
-        """重置调度器内部状态，不重置业务数据（食堂、窗口等）"""
+        """重置调度器内部状态，不重置业务数据"""
         self.current_time = 0
         self.snapshots.clear()
         self.event_log.clear()
         self.is_running = False
         self.paused = False
-        # 注意：不清空 queue_engines，它们关联的 window 对象会被外部重建
+        self.queue_engines.clear()   # 【修复缺陷3】清空旧的引擎引用
 
     # ========== 时间推进 ==========
     def tick(self):
@@ -68,8 +66,9 @@ class EventScheduler:
         if self.arrival_callback:
             try:
                 arrivals = self.arrival_callback(self.current_time)
-                for item in arrivals:
-                    self.log_event("arrival", item["user_id"], item["detail"])
+                if arrivals is not None:                 # 【修复 Bug 2】防御 None
+                    for item in arrivals:
+                        self.log_event("arrival", item["user_id"], item["detail"])
             except Exception as e:
                 print(f"⚠️ arrival_callback 失败: {e}")
 
@@ -79,22 +78,25 @@ class EventScheduler:
         self._take_snapshot()
 
     def run(self, duration, real_time_interval=0.5):
-        """运行仿真，支持暂停"""
+        """运行仿真，支持暂停/停止"""
         self.is_running = True
         self.paused = False
         try:
             for _ in range(duration):
                 if not self.is_running:
                     break
-                while self.paused:          # 暂停时等待
+                # 暂停循环（可被 stop() 跳出）
+                while self.paused and self.is_running:   # 【修复 Bug 1】增加 is_running 判断
                     time.sleep(0.1)
+                if not self.is_running:                  # 如果在暂停期间被 stop，立即退出
+                    break
                 self.tick()
                 time.sleep(real_time_interval)
         except KeyboardInterrupt:
             print("\n⏹️ 仿真被手动中断")
         self.is_running = False
-        print(f"✅ 仿真结束，共运行 {self.current_time} 分钟")
-        self._print_summary()
+        # print(f"✅ 仿真结束，共运行 {self.current_time} 分钟")
+        # self._print_summary()  # 摘要由 main.py 的 statistics 负责，避免重复
 
     # ========== 快照与日志 ==========
     def _take_snapshot(self):
