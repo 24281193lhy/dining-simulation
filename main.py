@@ -185,10 +185,18 @@ class UIAdapter:
             if not windows_info:
                 continue
             free_seats = len(canteen.available_seats())
+
+            total_seats = len(canteen.seats)
+            occupied_seats = total_seats - free_seats
+            occupancy_rate = (occupied_seats / total_seats * 100) if total_seats else 0
+
             result.append({
                 "id": cid,
                 "name": canteen.name,
                 "free_seats": free_seats,
+                "total_seats": total_seats,
+                "occupied_seats": occupied_seats,
+                "occupancy_rate": round(occupancy_rate, 2),
                 "total_queue": total_queue,
                 "windows": windows_info
             })
