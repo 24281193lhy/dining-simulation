@@ -113,7 +113,7 @@ def clear_snapshots():
 # ========== 启动监控（后台线程） ==========
 def start_monitor(port=5000):
     def run():
-        socketio.run(app, host='0.0.0.0', port=port, debug=False)
+        socketio.run(app, host='0.0.0.0', port=port, debug=False, allow_unsafe_werkzeug=True)
     thread = threading.Thread(target=run, daemon=True)
     thread.start()
 

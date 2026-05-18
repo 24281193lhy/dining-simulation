@@ -439,7 +439,6 @@ def main():
     set_scheduler(current_ctx.scheduler)
     set_reset_callback(reset_simulation)
     # 注册自动退出回调：当网页全部关闭时触发
-    set_auto_exit_callback(exit_event.set)
 
     start_simulation_thread(current_ctx, duration, tick_interval)
 
@@ -476,9 +475,6 @@ def main():
                                    f"平均等待 {stats['avg_wait_time']:.2f} min")
                     except Exception:
                         pass
-            else:
-                print_info("仿真已结束，主循环退出。")
-                break
     except KeyboardInterrupt:
         print_warning("\n⏹️ 用户中断，正在停止仿真...")
     finally:
