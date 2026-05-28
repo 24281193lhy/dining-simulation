@@ -23,6 +23,31 @@ from monitor.web_monitor import (
 # ========== 全局配置 ==========
 SIM_CONFIG = {}
 
+class AdminManager:
+    def __init__(self, config_dir="config"):
+        self.config_dir = config_dir
+        self.config_file = os.path.join(config_dir, "admin.json")
+        self._ensure_config()
+    def _ensure_config(self):
+        os.makedirs(self.config_dir, exist_ok=True)
+        if not os.path.exists(self.config_file):
+            default = {"username": "admin", "password": "admin123"}
+            with open(self.config_file, "w") as f:
+                json.dump(default, f, indent=2)
+    def authenticate(self, username, password):
+        with open(self.config_file, "r") as f:
+            data = json.load(f)
+        return data.get("username") == username and data.get("password") == password
+    def change_password(self, username, old_password, new_password):
+        if not self.authenticate(username, old_password):
+            return False
+        with open(self.config_file, "r") as f:
+            data = json.load(f)
+        data["password"] = new_password
+        with open(self.config_file, "w") as f:
+            json.dump(data, f, indent=2)
+        return True
+
 def load_config():
     global SIM_CONFIG
     try:
@@ -318,10 +343,24 @@ class SimulationContext:
 current_ctx = SimulationContext()
 sim_thread = None
 ctx_lock = threading.Lock()
+_simulation_started = False
 
 # 用于自动退出的事件
 exit_event = threading.Event()
 
+def start_simulation():
+    """由前端调用的启动函数（首次启动）"""
+    global _simulation_started, current_ctx, duration, tick_interval
+    if _simulation_started:
+        print_info("⚠️ 仿真已经启动，无需重复启动")
+        return
+    with ctx_lock:
+        if current_ctx.scheduler and not current_ctx.scheduler.is_running:
+            start_simulation_thread(current_ctx, duration, tick_interval)
+            _simulation_started = True
+            print_success("✅ 仿真已手动启动")
+        else:
+            print_warning("❌ 无法启动：调度器未就绪或已在运行")
 
 def init_simulation_context():
     storage = SimulationStorage(log_dir="logs")
@@ -422,11 +461,16 @@ def reset_simulation():
         current_ctx = new_ctx
     start_simulation_thread(new_ctx, duration, tick_interval)
     clear_snapshots()
+    _simulation_started = False
     print_success("仿真已重置并重新开始")
 
 
 def main():
     global current_ctx
+    global duration,tick_interval
+    from monitor.web_monitor import set_admin_manager
+    admin_manager = AdminManager()
+    set_admin_manager(admin_manager)
     sim_cfg = load_config()
     duration = sim_cfg["duration"]
     tick_interval = sim_cfg["tick_interval"]
@@ -438,9 +482,11 @@ def main():
     set_adapter(current_ctx.adapter)
     set_scheduler(current_ctx.scheduler)
     set_reset_callback(reset_simulation)
+    from monitor.web_monitor import set_start_callback
+    set_start_callback(start_simulation)
     # 注册自动退出回调：当网页全部关闭时触发
 
-    start_simulation_thread(current_ctx, duration, tick_interval)
+    #start_simulation_thread(current_ctx, duration, tick_interval)
 
     start_monitor(port=5000)
 

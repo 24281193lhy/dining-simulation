@@ -657,6 +657,7 @@ canvas {
 <script>
 (function() {
     const socket = io();
+    let simulationStarted = false;   // 标记仿真是否已启动过
     let servedChart, queueChart, barChart;
     let activityLogs = [];
     let currentWindowNames = [];
@@ -1047,29 +1048,46 @@ async function rebuildCharts() {
 
     // 控制仿真状态
     async function controlSim(action) {
+    if (action === 'resume' && !simulationStarted) {
+        // 首次启动：调用专用启动接口
+        const res = await fetch('/api/simulation/start', { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'started') {
+            simulationStarted = true;
+            document.getElementById('config-panel').classList.add('disabled');
+        } else {
+            alert('启动失败: ' + (data.error || '未知错误'));
+        }
+    } else {
+        // 暂停或恢复已启动的仿真
         const res = await fetch('/api/simulation/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
         const data = await res.json();
         if (data.status === 'ok') {
-            if (action === 'resume') document.getElementById('config-panel').classList.add('disabled');
-            else if (action === 'pause' || action === 'stop') document.getElementById('config-panel').classList.remove('disabled');
+            if (action === 'resume') {
+                document.getElementById('config-panel').classList.add('disabled');
+            } else if (action === 'pause' || action === 'stop') {
+                document.getElementById('config-panel').classList.remove('disabled');
+            }
             if (action === 'stop') {
-                // 停止后可以刷新页面或提示
-                alert('仿真已停止。如需重新开始，请重启程序。');
+                alert('仿真已停止。如需重新开始，请重置。');
             }
         } else {
             alert('操作失败: ' + data.error);
         }
     }
+}
 
     document.getElementById('btn-start').onclick = () => controlSim('resume');
     document.getElementById('btn-pause').onclick = () => controlSim('pause');
     document.getElementById('btn-stop').onclick = () => controlSim('stop');
     document.getElementById('btn-reset').onclick = async () => {
+    // 如果页面不刷新，需要重置标志
+    simulationStarted = false;   // 新增
     const res = await fetch('/api/simulation/reset', { method: 'POST' });
     const data = await res.json();
     if (data.status === 'reset initiated') {
         alert('仿真已重置，页面将重新加载数据。');
-        location.reload();
+        location.reload();   // 如果刷新页面，上面的标志重置其实可省略
     } else {
         alert('重置失败：' + (data.error || '未知错误'));
     }

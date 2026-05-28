@@ -5,6 +5,9 @@ from collections import deque
 
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
+from flask import session, redirect, url_for, request, render_template
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from functools import wraps
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -24,8 +27,10 @@ snapshots_lock = threading.Lock()
 _adapter = None
 _scheduler = None
 _reset_callback = None
+_start_callback = None
 _storage = None
 _globals_lock = threading.Lock()
+_admin_manager = None
 
 # 自动退出回调与客户端追踪
 _auto_exit_callback = None
@@ -49,6 +54,9 @@ def set_reset_callback(callback):
         global _reset_callback
         _reset_callback = callback
 
+def set_start_callback(callback):
+    global _start_callback
+    _start_callback = callback
 
 def set_storage(storage):
     with _globals_lock:
@@ -75,11 +83,21 @@ def _get_storage():
     with _globals_lock:
         return _storage
 
+def set_admin_manager(admin_manager):
+    global _admin_manager
+    _admin_manager = admin_manager
+
+def login_required(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('login_page'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 # ========== 路由 ==========
-@app.route('/')
-def index():
-    return render_template('dashboard.html')
 
 
 @socketio.on('connect')
@@ -97,6 +115,60 @@ def handle_disconnect():
     # 所有客户端都断开时触发自动退出
     if not connected_clients and _auto_exit_callback:
         _auto_exit_callback()
+
+# 登录页面 (GET)
+@app.route('/login', methods=['GET'])
+def login_page():
+    if session.get('logged_in'):
+        return redirect(url_for('index'))
+    return render_template('login.html', error=None, message=None)
+
+# 登录处理 (POST)
+@app.route('/login', methods=['POST'])
+def login_post():
+    username = request.form.get('username')
+    password = request.form.get('password')
+    if _admin_manager and _admin_manager.authenticate(username, password):
+        session['logged_in'] = True
+        session['username'] = username
+        return redirect(url_for('index'))
+    return render_template('login.html', error='用户名或密码错误', message=None)
+
+# 修改密码页面 (GET)
+@app.route('/change-password', methods=['GET'])
+def change_password_page():
+    return render_template('change_password.html', error=None, success=None)
+
+# 修改密码处理 (POST)
+@app.route('/change-password', methods=['POST'])
+def change_password_post():
+    username = request.form.get('username')
+    old_pwd = request.form.get('old_password')
+    new_pwd = request.form.get('new_password')
+    confirm = request.form.get('confirm_password')
+    if not all([username, old_pwd, new_pwd, confirm]):
+        return render_template('change_password.html', error='请填写完整信息', success=None)
+    if new_pwd != confirm:
+        return render_template('change_password.html', error='两次新密码不一致', success=None)
+    if _admin_manager and _admin_manager.change_password(username, old_pwd, new_pwd):
+        # 修改成功，如果当前登录用户就是修改者，则退出登录重新认证
+        if session.get('username') == username:
+            session.clear()
+        return render_template('change_password.html', success='密码修改成功，请重新登录', error=None)
+    else:
+        return render_template('change_password.html', error='原密码错误或用户名不存在', success=None)
+
+# 原有首页路由添加登录保护
+@app.route('/')
+@login_required
+def index():
+    return render_template('dashboard.html')
+
+# 退出登录路由
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login_page'))
 
 
 # ========== 推送函数（线程安全） ==========
@@ -138,6 +210,7 @@ def clear_snapshots():
 # ========== 启动监控（后台线程） ==========
 def start_monitor(port=5000):
     def run():
+        app.secret_key = os.urandom(24)  # 或者固定一个字符串
         socketio.run(app, host='0.0.0.0', port=port, debug=False, allow_unsafe_werkzeug=True)
 
     thread = threading.Thread(target=run, daemon=True)
@@ -310,6 +383,13 @@ def control_simulation():
 
     return jsonify({'status': 'ok'})
 
+@app.route('/api/simulation/start', methods=['POST'])
+def start_simulation():
+    if _start_callback:
+        _start_callback()
+        return jsonify({'status': 'started'})
+    else:
+        return jsonify({'error': 'start callback not registered'}), 500
 
 @app.route('/api/simulation/status')
 def simulation_status():
