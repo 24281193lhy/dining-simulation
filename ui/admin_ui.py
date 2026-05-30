@@ -243,3 +243,4 @@ class AdminUI:
         except Exception as e:
             print_error(f"统计生成失败: {e}")
         input("按回车继续...")
+        #A

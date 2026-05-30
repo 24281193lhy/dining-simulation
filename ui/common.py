@@ -40,3 +40,4 @@ def validate_teacher_id(teacher_id):
     与系统 UserManager 的验证规则保持一致
     """
     return bool(re.fullmatch(r"T\d{3,}", teacher_id, re.IGNORECASE))
+#A

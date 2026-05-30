@@ -92,3 +92,5 @@ class StatisticsAnalyzer:
                 rate = occupied / total * 100
                 canteen_occ[int(cid)].append(rate)
         return {cid: sum(rates)/len(rates) for cid, rates in canteen_occ.items()}
+
+#A

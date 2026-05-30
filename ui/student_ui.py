@@ -206,3 +206,4 @@ class StudentUI:
         else:
             print_warning("您尚未入座或已离开。")
         input("按回车继续...")
+        #A

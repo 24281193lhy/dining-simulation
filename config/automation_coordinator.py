@@ -272,3 +272,4 @@ class AutomationCoordinator:
         except:
             pass
         return "未知窗口"
+#A

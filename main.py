@@ -532,6 +532,7 @@ def main():
         if sim_thread and sim_thread.is_alive():
             sim_thread.join(timeout=2)
         print_success("✅ 仿真系统正常退出")
+        #A
 
 
 if __name__ == "__main__":

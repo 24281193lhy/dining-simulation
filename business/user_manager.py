@@ -79,3 +79,5 @@ class UserManager:
     def verify_teacher(self, user_id):
         """教工号格式：T + 至少3位数字"""
         return bool(re.fullmatch(r"T\d{3,}", str(user_id)))
+
+#A

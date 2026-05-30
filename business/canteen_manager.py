@@ -150,3 +150,4 @@ class CanteenManager:
         for canteen in self.canteens.values():
             result.extend(canteen.windows.values())
         return result
+    #A

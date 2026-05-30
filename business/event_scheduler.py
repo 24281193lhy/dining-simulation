@@ -153,3 +153,4 @@ class EventScheduler:
             print(f"\n🏫 {canteen.name}")
             for window in canteen.windows.values():
                 print(f"  窗口[{window.window_id}] {window.name}: 服务 {window.total_served} 人")
+    #A
