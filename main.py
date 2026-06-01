@@ -23,30 +23,63 @@ from monitor.web_monitor import (
 # ========== 全局配置 ==========
 SIM_CONFIG = {}
 
+import os
+
 class AdminManager:
     def __init__(self, config_dir="config"):
         self.config_dir = config_dir
         self.config_file = os.path.join(config_dir, "admin.json")
-        self._ensure_config()
+        # 从环境变量获取默认密码
+        self.env_username = os.environ.get("ADMIN_USERNAME", "admin")
+        self.env_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+        self._ensure_config()  # 本地开发时仍然写文件，但部署时不会报错
+
     def _ensure_config(self):
-        os.makedirs(self.config_dir, exist_ok=True)
-        if not os.path.exists(self.config_file):
-            default = {"username": "admin", "password": "admin123"}
-            with open(self.config_file, "w") as f:
-                json.dump(default, f, indent=2)
+        # 仅当文件系统可写时才创建文件（本地开发用）
+        try:
+            os.makedirs(self.config_dir, exist_ok=True)
+            if not os.path.exists(self.config_file):
+                default = {"username": self.env_username, "password": self.env_password}
+                with open(self.config_file, "w") as f:
+                    json.dump(default, f, indent=2)
+        except (OSError, IOError):
+            # 部署环境只读，忽略写入错误
+            pass
+
     def authenticate(self, username, password):
-        with open(self.config_file, "r") as f:
-            data = json.load(f)
-        return data.get("username") == username and data.get("password") == password
-    def change_password(self, username, old_password, new_password):
-        if not self.authenticate(username, old_password):
+        # 优先使用环境变量
+        if username == self.env_username and password == self.env_password:
+            return True
+        # 其次尝试文件（本地开发）
+        try:
+            with open(self.config_file, "r") as f:
+                data = json.load(f)
+            return data.get("username") == username and data.get("password") == password
+        except (FileNotFoundError, json.JSONDecodeError):
             return False
-        with open(self.config_file, "r") as f:
-            data = json.load(f)
-        data["password"] = new_password
-        with open(self.config_file, "w") as f:
-            json.dump(data, f, indent=2)
-        return True
+
+    def change_password(self, username, old_password, new_password):
+        # 环境变量方式不支持修改密码，仅文件方式支持
+        if username == self.env_username and old_password == self.env_password:
+            # 尝试更新文件（如果可写）
+            try:
+                with open(self.config_file, "w") as f:
+                    json.dump({"username": username, "password": new_password}, f, indent=2)
+                return True
+            except (OSError, IOError):
+                return False
+        # 原有文件认证逻辑...
+        try:
+            with open(self.config_file, "r") as f:
+                data = json.load(f)
+            if data.get("username") == username and data.get("password") == old_password:
+                data["password"] = new_password
+                with open(self.config_file, "w") as f:
+                    json.dump(data, f, indent=2)
+                return True
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            pass
+        return False
 
 def load_config():
     global SIM_CONFIG
