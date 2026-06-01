@@ -1,0 +1,17 @@
+{
+  "builds": [
+    {
+      "src": "monitor/web_monitor.py",
+      "use": "@vercel/python",
+      "config": {
+        "entrypoint": "monitor/web_monitor:app"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "monitor/web_monitor.py"
+    }
+  ]
+}
