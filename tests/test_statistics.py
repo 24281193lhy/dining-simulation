@@ -1,11 +1,7 @@
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 import tempfile
 import pytest
-from data import SimulationStorage
-from data import StatisticsAnalyzer
+from canteen_sim.data.storage import SimulationStorage
+from canteen_sim.data.statistics import StatisticsAnalyzer
 
 class TestStatisticsAnalyzer:
     @pytest.fixture

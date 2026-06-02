@@ -4,13 +4,13 @@ import json
 import threading
 from collections import defaultdict
 from typing import Dict, List, Optional
-from business.event_scheduler import EventScheduler
-from monitor.web_monitor import push_user_activity
+from canteen_sim.business.event_scheduler import EventScheduler
+from canteen_sim.monitor.web_monitor import push_user_activity
 
 class AutomationCoordinator:
     """自动化仿真协调器，处理用户到达、决策、用餐流程（线程安全）"""
 
-    def __init__(self, canteen_manager, user_manager, queue_engines, seat_managers, storage, config_path="config.json"):
+    def __init__(self, canteen_manager, user_manager, queue_engines, seat_managers, storage, config_path="canteen_sim/config/config.json"):
         self.cm = canteen_manager
         self.um = user_manager
         self.qe = queue_engines
@@ -256,7 +256,7 @@ class AutomationCoordinator:
             push_user_activity(uid, "用餐结束，离开食堂", current_time)
 
     def finalize_statistics(self, storage):
-        from data.statistics import StatisticsAnalyzer
+        from canteen_sim.data.statistics import StatisticsAnalyzer
         analyzer = StatisticsAnalyzer(storage)
         stats = analyzer.compute_all()
         storage.export_statistics(stats, "final_stats.json")

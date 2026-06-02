@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch, call
 from collections import deque
 
 # 假设你的项目结构中 business 包可导入
-from business.event_scheduler import EventScheduler
+from canteen_sim.business.event_scheduler import EventScheduler
 
 
 # 辅助工厂函数：创建一个模拟的 CanteenManager，包含一个食堂和两个窗口

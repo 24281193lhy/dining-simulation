@@ -1,13 +1,10 @@
 
 # tests/test_logger.py
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 import tempfile
 import logging
+import os
 import pytest
-from utils.logger import get_logger
+from canteen_sim.utils.logger import get_logger
 
 class TestLogger:
     def test_get_logger_returns_logger(self):

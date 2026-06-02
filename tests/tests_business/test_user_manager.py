@@ -3,7 +3,7 @@
 import pytest
 import re
 from unittest.mock import patch
-from business.user_manager import User, UserManager
+from canteen_sim.business.user_manager import User, UserManager
 
 
 class TestUser:

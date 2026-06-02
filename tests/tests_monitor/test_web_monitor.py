@@ -1,7 +1,7 @@
 import pytest
 import json
 from unittest.mock import MagicMock, patch
-from monitor import web_monitor
+from canteen_sim.monitor import web_monitor
 
 
 # 每个测试前后重置全局状态
@@ -74,7 +74,7 @@ class TestGlobalSetters:
 
 # ========== 首页 ==========
 class TestIndexRoute:
-    @patch('monitor.web_monitor.render_template')
+    @patch('canteen_sim.monitor.web_monitor.render_template')
     def test_index(self, mock_render):
         mock_render.return_value = "<html>fake</html>"
         with web_monitor.app.test_client() as client:
@@ -85,13 +85,13 @@ class TestIndexRoute:
 
 # ========== Socket.IO 事件处理 ==========
 class TestSocketIOEvents:
-    @patch('monitor.web_monitor.emit')
+    @patch('canteen_sim.monitor.web_monitor.emit')
     def test_handle_connect(self, mock_emit):
         web_monitor.snapshots.extend(['snap1', 'snap2'])
         web_monitor.handle_connect()
         mock_emit.assert_called_once_with('history', ['snap1', 'snap2'])
 
-    @patch('monitor.web_monitor.socketio.emit')
+    @patch('canteen_sim.monitor.web_monitor.socketio.emit')
     def test_push_snapshot(self, mock_emit):
         data = {'time': 1, 'data': 'x'}
         web_monitor.push_snapshot(data)
@@ -99,7 +99,7 @@ class TestSocketIOEvents:
         assert len(web_monitor.snapshots) == 1
         assert web_monitor.snapshots[0] == data
 
-    @patch('monitor.web_monitor.socketio.emit')
+    @patch('canteen_sim.monitor.web_monitor.socketio.emit')
     def test_push_user_activity(self, mock_emit):
         web_monitor.push_user_activity('U1', '开始打饭', timestamp=125)
         expected_time = '02:05'   # 125分钟 = 2小时5分钟
@@ -109,13 +109,13 @@ class TestSocketIOEvents:
             'detail': '开始打饭'
         })
 
-    @patch('monitor.web_monitor.socketio.emit')
+    @patch('canteen_sim.monitor.web_monitor.socketio.emit')
     def test_push_simulation_summary(self, mock_emit):
         stats = {'total': 100}
         web_monitor.push_simulation_summary(stats)
         mock_emit.assert_called_once_with('simulation_end', stats)
 
-    @patch('monitor.web_monitor.socketio.emit')
+    @patch('canteen_sim.monitor.web_monitor.socketio.emit')
     def test_push_final_statistics(self, mock_emit):
         stats = {'avg_wait': 12.3}
         web_monitor.push_final_statistics(stats)

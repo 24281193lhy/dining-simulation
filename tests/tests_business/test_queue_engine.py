@@ -4,8 +4,8 @@ import pytest
 from collections import deque
 from unittest.mock import MagicMock
 
-from business.canteen_manager import Window, Dish
-from business.queue_engine import QueueEngine
+from canteen_sim.business.canteen_manager import Window, Dish
+from canteen_sim.business.queue_engine import QueueEngine
 
 
 class MockUser:

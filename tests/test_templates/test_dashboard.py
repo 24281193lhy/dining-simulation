@@ -2,7 +2,7 @@
 
 import pytest
 from flask import render_template
-from monitor import web_monitor
+from canteen_sim.monitor import web_monitor
 
 
 class TestDashboardTemplate:

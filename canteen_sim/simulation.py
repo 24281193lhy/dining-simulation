@@ -1,93 +1,35 @@
-import sys
-import os
-import threading
-import time
 import json
+import os
+import random
+import threading
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from business.canteen_manager import CanteenManager, Dish
-from business.queue_engine import QueueEngine
-from business.seat_manager import SeatManager
-from business.user_manager import UserManager
-from business.event_scheduler import EventScheduler
-from data.storage import SimulationStorage
-from utils.display import print_info, print_success, print_warning
-from config.automation_coordinator import AutomationCoordinator
-from monitor.web_monitor import (
+from canteen_sim.business.canteen_manager import CanteenManager, Dish
+from canteen_sim.business.queue_engine import QueueEngine
+from canteen_sim.business.seat_manager import SeatManager
+from canteen_sim.business.user_manager import UserManager
+from canteen_sim.business.event_scheduler import EventScheduler
+from canteen_sim.data.storage import SimulationStorage
+from canteen_sim.utils.display import print_info, print_success, print_warning
+from canteen_sim.config.automation_coordinator import AutomationCoordinator
+from canteen_sim.monitor.web_monitor import (
     start_monitor, push_snapshot, set_adapter, set_scheduler,
     set_reset_callback, push_final_statistics, push_simulation_summary,
     clear_snapshots, set_storage, set_auto_exit_callback
 )
 
-# ========== 全局配置 ==========
 SIM_CONFIG = {}
 
-import os
-
-class AdminManager:
-    def __init__(self, config_dir="config"):
-        self.config_dir = config_dir
-        self.config_file = os.path.join(config_dir, "admin.json")
-        # 从环境变量获取默认密码
-        self.env_username = os.environ.get("ADMIN_USERNAME", "admin")
-        self.env_password = os.environ.get("ADMIN_PASSWORD", "admin123")
-        self._ensure_config()  # 本地开发时仍然写文件，但部署时不会报错
-
-    def _ensure_config(self):
-        # 仅当文件系统可写时才创建文件（本地开发用）
-        try:
-            os.makedirs(self.config_dir, exist_ok=True)
-            if not os.path.exists(self.config_file):
-                default = {"username": self.env_username, "password": self.env_password}
-                with open(self.config_file, "w") as f:
-                    json.dump(default, f, indent=2)
-        except (OSError, IOError):
-            # 部署环境只读，忽略写入错误
-            pass
-
-    def authenticate(self, username, password):
-        # 优先使用环境变量
-        if username == self.env_username and password == self.env_password:
-            return True
-        # 其次尝试文件（本地开发）
-        try:
-            with open(self.config_file, "r") as f:
-                data = json.load(f)
-            return data.get("username") == username and data.get("password") == password
-        except (FileNotFoundError, json.JSONDecodeError):
-            return False
-
-    def change_password(self, username, old_password, new_password):
-        # 环境变量方式不支持修改密码，仅文件方式支持
-        if username == self.env_username and old_password == self.env_password:
-            # 尝试更新文件（如果可写）
-            try:
-                with open(self.config_file, "w") as f:
-                    json.dump({"username": username, "password": new_password}, f, indent=2)
-                return True
-            except (OSError, IOError):
-                return False
-        # 原有文件认证逻辑...
-        try:
-            with open(self.config_file, "r") as f:
-                data = json.load(f)
-            if data.get("username") == username and data.get("password") == old_password:
-                data["password"] = new_password
-                with open(self.config_file, "w") as f:
-                    json.dump(data, f, indent=2)
-                return True
-        except (FileNotFoundError, json.JSONDecodeError, OSError):
-            pass
-        return False
 
 def load_config():
-    global SIM_CONFIG
+    global SIM_CONFIG, duration, tick_interval
+    # 包所在目录，确保从任意路径启动都能找到配置
+    pkg_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(pkg_dir, "config", "config.json")
     try:
-        with open("config/config.json", 'r', encoding='utf-8') as f:
+        with open(config_path, 'r', encoding='utf-8') as f:
             SIM_CONFIG = json.load(f)
     except FileNotFoundError:
-        print_warning("配置文件 config/config.json 未找到，使用默认配置。")
+        print_warning(f"配置文件 {config_path} 未找到，使用默认配置。")
         SIM_CONFIG = {
             "simulation": {
                 "duration": 120,
@@ -96,14 +38,15 @@ def load_config():
                 "stats_interval_unit": "second"
             }
         }
-    return SIM_CONFIG["simulation"]
+    sim_cfg = SIM_CONFIG["simulation"]
+    duration = sim_cfg["duration"]
+    tick_interval = sim_cfg["tick_interval"]
+    return sim_cfg
 
 
-# ========== 初始化业务层 ==========
 def init_business(storage):
     canteen_manager = CanteenManager()
 
-    # 学生第一食堂
     c1 = canteen_manager.add_canteen("学生第一食堂", total_seats=120)
     w1_1 = c1.add_window("快餐窗口", speed=0.8, window_type='normal')
     w1_1.add_dish(Dish("红烧肉套餐", 15.0))
@@ -112,7 +55,6 @@ def init_business(storage):
     w1_2.add_dish(Dish("牛肉拉面", 12.0))
     w1_2.add_dish(Dish("炸酱面", 10.0))
 
-    # 教工食堂
     c2 = canteen_manager.add_canteen("教工食堂", total_seats=80)
     w2_1 = c2.add_window("教工专窗", speed=1.0, window_type='teacher')
     w2_1.add_dish(Dish("教师套餐A", 18.0))
@@ -120,16 +62,13 @@ def init_business(storage):
     w2_2 = c2.add_window("普通窗口", speed=1.0, window_type='normal')
     w2_2.add_dish(Dish("盖浇饭", 13.0))
 
-    # 风味餐厅
     c3 = canteen_manager.add_canteen("风味餐厅", total_seats=100)
     w3_1 = c3.add_window("麻辣烫", speed=1.5, window_type='normal')
     w3_1.add_dish(Dish("自选麻辣烫", 16.0))
     w3_2 = c3.add_window("铁板饭", speed=1.3, window_type='normal')
     w3_2.add_dish(Dish("黑椒牛肉铁板", 18.0))
 
-    # 用户管理器
     user_manager = UserManager()
-    import random
     existing_ids = set()
     while len(existing_ids) < 200:
         year = random.randint(22, 25)
@@ -143,7 +82,6 @@ def init_business(storage):
     for i in range(1, 21):
         user_manager.add_user(f"T{i:03d}", role='teacher')
 
-    # 队列引擎 & 座位管理器
     queue_engines = {}
     for canteen in canteen_manager.canteens.values():
         for window in canteen.windows.values():
@@ -167,7 +105,6 @@ def init_business(storage):
     }
 
 
-# ========== UI适配器 ==========
 class UIAdapter:
     def __init__(self, canteen_manager, user_manager, queue_engines, seat_managers, scheduler):
         self.cm = canteen_manager
@@ -354,7 +291,6 @@ class UIAdapter:
         return result
 
 
-# ========== 全局仿真状态管理 ==========
 class SimulationContext:
     def __init__(self):
         self.storage = None
@@ -373,27 +309,29 @@ class SimulationContext:
             return self._build_snapshot(current_time)
         return {}
 
+
 current_ctx = SimulationContext()
 sim_thread = None
 ctx_lock = threading.Lock()
 _simulation_started = False
-
-# 用于自动退出的事件
 exit_event = threading.Event()
+duration = 60
+tick_interval = 2.0
+
 
 def start_simulation():
-    """由前端调用的启动函数（首次启动）"""
     global _simulation_started, current_ctx, duration, tick_interval
     if _simulation_started:
-        print_info("⚠️ 仿真已经启动，无需重复启动")
+        print_info("[WARN] 仿真已经启动，无需重复启动")
         return
     with ctx_lock:
         if current_ctx.scheduler and not current_ctx.scheduler.is_running:
             start_simulation_thread(current_ctx, duration, tick_interval)
             _simulation_started = True
-            print_success("✅ 仿真已手动启动")
+            print_success("[OK] 仿真已手动启动")
         else:
-            print_warning("❌ 无法启动：调度器未就绪或已在运行")
+            print_warning("[ERR] 无法启动：调度器未就绪或已在运行")
+
 
 def init_simulation_context():
     storage = SimulationStorage(log_dir="logs")
@@ -406,9 +344,10 @@ def init_simulation_context():
     seat_managers = biz['seat_managers']
     scheduler = biz['scheduler']
 
+    pkg_dir = os.path.dirname(os.path.abspath(__file__))
     coordinator = AutomationCoordinator(
         canteen_manager, user_manager, queue_engines, seat_managers, storage,
-        config_path="config/config.json"
+        config_path=os.path.join(pkg_dir, "config", "config.json")
     )
     coordinator.bind_scheduler(scheduler)
     scheduler.set_serve_finished_callback(coordinator.on_serve_finished)
@@ -425,7 +364,7 @@ def init_simulation_context():
                     "queue_length": queue_len
                 }
         try:
-            from data.statistics import StatisticsAnalyzer
+            from canteen_sim.data.statistics import StatisticsAnalyzer
             analyzer = StatisticsAnalyzer(storage)
             stats = analyzer.compute_all()
         except Exception:
@@ -449,6 +388,9 @@ def init_simulation_context():
     ctx.coordinator = coordinator
     ctx.adapter = adapter
     ctx._build_snapshot = _build_snapshot
+
+    global current_ctx
+    current_ctx = ctx
     return ctx
 
 
@@ -458,11 +400,11 @@ def start_simulation_thread(ctx, duration, tick_interval):
         ctx.coordinator.tick_post_process(ctx.scheduler.current_time)
         final_snapshot = ctx.build_snapshot(ctx.scheduler.current_time)
         push_snapshot(final_snapshot)
-        print_success("\n📊 仿真完成，正在生成统计报告...")
+        print_success("\n[Stats] 仿真完成，正在生成统计报告...")
         stats = ctx.coordinator.finalize_statistics(ctx.storage)
         push_final_statistics(stats)
         push_simulation_summary(stats)
-        print_success("\n📊 仿真完成，统计结果已发送至前端")
+        print_success("\n[Stats] 仿真完成，统计结果已发送至前端")
         print_info(f"平均等待时间：{stats['avg_wait_time']:.2f} 分钟")
         print_info(f"总服务人数：{stats['total_served']}")
         print_info(f"平均座位占用率：{stats['avg_seat_occupancy']}")
@@ -475,16 +417,14 @@ def start_simulation_thread(ctx, duration, tick_interval):
 
 
 def reset_simulation():
-    global current_ctx, sim_thread
+    global current_ctx, sim_thread, _simulation_started
     print_warning("正在重置仿真...")
     if current_ctx.scheduler:
         current_ctx.scheduler.stop()
     if sim_thread and sim_thread.is_alive():
         sim_thread.join(timeout=2)
 
-    sim_cfg = load_config()
-    duration = sim_cfg["duration"]
-    tick_interval = sim_cfg["tick_interval"]
+    load_config()
 
     new_ctx = init_simulation_context()
     set_adapter(new_ctx.adapter)
@@ -492,81 +432,9 @@ def reset_simulation():
 
     with ctx_lock:
         current_ctx = new_ctx
-    start_simulation_thread(new_ctx, duration, tick_interval)
     clear_snapshots()
     _simulation_started = False
-    print_success("仿真已重置并重新开始")
-
-
-def main():
-    global current_ctx
-    global duration,tick_interval
-    from monitor.web_monitor import set_admin_manager
-    admin_manager = AdminManager()
-    set_admin_manager(admin_manager)
-    sim_cfg = load_config()
-    duration = sim_cfg["duration"]
-    tick_interval = sim_cfg["tick_interval"]
-    stats_interval = sim_cfg.get("stats_interval", 5)
-    if sim_cfg.get("stats_interval_unit") == "minute":
-        stats_interval *= 60
-
-    current_ctx = init_simulation_context()
-    set_adapter(current_ctx.adapter)
-    set_scheduler(current_ctx.scheduler)
-    set_reset_callback(reset_simulation)
-    from monitor.web_monitor import set_start_callback
-    set_start_callback(start_simulation)
-    # 注册自动退出回调：当网页全部关闭时触发
-
-    #start_simulation_thread(current_ctx, duration, tick_interval)
-
-    start_monitor(port=5000)
-
-    import webbrowser
-    webbrowser.open('http://localhost:5000')
-
-    print_info("🌐 实时监测仪表盘已启动，请访问 http://localhost:5000")
-    print_success("🚀 自动化食堂仿真系统启动")
-    print_info(f"⏱️ 仿真时长：{duration} 分钟")
-    print_info(f"👥 用户总数：{len(current_ctx.user_manager.get_all_users())}")
-    print_info(f"🍽️ 食堂数量：{len(current_ctx.canteen_manager.canteens)}")
-
-    # 主循环
-    try:
-        while not exit_event.is_set():      # 检查自动退出信号
-            # 用 wait 代替 sleep，可被立即中断
-            if exit_event.wait(timeout=stats_interval):
-                break
-            with ctx_lock:
-                ctx = current_ctx
-            if ctx.scheduler and ctx.scheduler.is_running:
-                if not ctx.scheduler.paused:
-                    ctx.coordinator.tick_post_process(ctx.scheduler.current_time)
-                    snapshot = ctx.build_snapshot(ctx.scheduler.current_time)
-                    push_snapshot(snapshot)
-                    try:
-                        from data.statistics import StatisticsAnalyzer
-                        analyzer = StatisticsAnalyzer(ctx.storage)
-                        stats = analyzer.compute_all()
-                        print_info(f"[t={ctx.scheduler.current_time:.0f}min] "
-                                   f"已服务 {stats['total_served']} 人，"
-                                   f"平均等待 {stats['avg_wait_time']:.2f} min")
-                    except Exception:
-                        pass
-    except KeyboardInterrupt:
-        print_warning("\n⏹️ 用户中断，正在停止仿真...")
-    finally:
-        print_warning("正在关闭仿真...")
-        with ctx_lock:
-            ctx = current_ctx
-        if ctx.scheduler:
-            ctx.scheduler.stop()
-        if sim_thread and sim_thread.is_alive():
-            sim_thread.join(timeout=2)
-        print_success("✅ 仿真系统正常退出")
-        #A
-
-
-if __name__ == "__main__":
-    main()
+    print_success("仿真已重置，请点击开始按钮启动")
+    # 注册到 web_monitor
+    set_adapter(new_ctx.adapter)
+    set_scheduler(new_ctx.scheduler)

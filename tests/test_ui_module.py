@@ -1,15 +1,9 @@
-import sys
-import os
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, project_root)
-sys.path.insert(0, os.path.join(project_root, 'src'))
-
 import unittest
 from unittest.mock import Mock, patch
 
-from ui.common import validate_student_id, validate_teacher_id
-from ui.student_ui import StudentUI
-from ui.admin_ui import AdminUI
+from canteen_sim.ui.common import validate_student_id, validate_teacher_id
+from canteen_sim.ui.student_ui import StudentUI
+from canteen_sim.ui.admin_ui import AdminUI
 
 
 class TestCommon(unittest.TestCase):
@@ -50,7 +44,7 @@ class TestStudentUI(unittest.TestCase):
         ]
         self.mock_cm.get_all_canteens_status.return_value = fake_canteens
         self.student_ui.current_user_obj = Mock()
-        with patch('ui.student_ui.print_header'), patch('ui.student_ui.print_table'):
+        with patch('canteen_sim.ui.student_ui.print_header'), patch('canteen_sim.ui.student_ui.print_table'):
             self.student_ui.show_canteen_overview()
         self.mock_cm.get_all_canteens_status.assert_called_once_with(user=self.student_ui.current_user_obj)
 
@@ -59,7 +53,7 @@ class TestStudentUI(unittest.TestCase):
             "window_name": "窗口1", "ahead": 2, "wait_time": 45
         }
         self.student_ui.current_user = {"id": "S001"}
-        with patch('ui.student_ui.print_info') as mock_print:
+        with patch('canteen_sim.ui.student_ui.print_info') as mock_print:
             self.student_ui.check_queue_status()
             mock_print.assert_called_once()
         self.mock_qe.get_user_queue_status.assert_called_once_with("S001")

@@ -1,5 +1,5 @@
-from utils.display import clear_screen, print_table, print_info, print_error, print_warning, print_header
-from ui.common import get_user_input, validate_student_id, validate_teacher_id
+from canteen_sim.utils.display import clear_screen, print_table, print_info, print_error, print_warning, print_header
+from canteen_sim.ui.common import get_user_input, validate_student_id, validate_teacher_id
 import time
 
 class StudentUI:

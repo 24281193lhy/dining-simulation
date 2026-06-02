@@ -1,5 +1,5 @@
 import re
-from utils.display import print_error, print_warning, print_header
+from canteen_sim.utils.display import print_error, print_warning, print_header
 
 def get_user_input(prompt, valid_options=None, allow_empty=False):
     while True:

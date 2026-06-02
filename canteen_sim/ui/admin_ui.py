@@ -1,8 +1,8 @@
 # ui/admin_ui.py
-from utils.display import clear_screen, print_table, print_info, print_error, print_header, print_warning
-from ui.common import get_user_input
+from canteen_sim.utils.display import clear_screen, print_table, print_info, print_error, print_header, print_warning
+from canteen_sim.ui.common import get_user_input
 import time
-from data.statistics import StatisticsAnalyzer
+from canteen_sim.data.statistics import StatisticsAnalyzer
 
 
 class AdminUI:

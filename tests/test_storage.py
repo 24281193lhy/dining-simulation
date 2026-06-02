@@ -1,11 +1,7 @@
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 import json
 import tempfile
 import pytest
-from data import SimulationStorage
+from canteen_sim.data.storage import SimulationStorage
 
 class TestSimulationStorage:
     @pytest.fixture

@@ -5,3 +5,18 @@ logs/
 *.log
 .idea/
 .DS_Store
+
+# 凭据文件
+.env
+admin.json
+config/admin.json
+
+# 测试
+.pytest_cache/
+htmlcov/
+.coverage
+
+# 打包
+dist/
+build/
+*.egg-info/

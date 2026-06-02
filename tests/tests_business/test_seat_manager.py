@@ -2,8 +2,8 @@
 
 import pytest
 from unittest.mock import patch
-from business.canteen_manager import Canteen, Seat
-from business.seat_manager import SeatManager
+from canteen_sim.business.canteen_manager import Canteen, Seat
+from canteen_sim.business.seat_manager import SeatManager
 
 
 class MockUser:

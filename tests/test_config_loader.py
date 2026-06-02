@@ -1,11 +1,8 @@
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 import json
+import os
 import tempfile
 import pytest
-from utils.config_loader import ConfigLoader, DEFAULT_CONFIG
+from canteen_sim.utils.config_loader import ConfigLoader, DEFAULT_CONFIG
 
 class TestConfigLoader:
     def test_load_default_created(self):

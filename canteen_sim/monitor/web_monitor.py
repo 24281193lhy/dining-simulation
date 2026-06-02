@@ -10,7 +10,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from functools import wraps
 
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 template_dir = os.path.join(BASE_DIR, 'templates')
 
 app = Flask(__name__, template_folder=template_dir)
@@ -208,7 +208,7 @@ def clear_snapshots():
 
 
 # ========== 启动监控（后台线程） ==========
-def start_monitor(port=5000):
+def start_monitor(port=8082):
     def run():
         app.secret_key = os.urandom(24)  # 或者固定一个字符串
         socketio.run(app, host='0.0.0.0', port=port, debug=False, allow_unsafe_werkzeug=True)
@@ -423,7 +423,7 @@ def api_get_statistics():
         return jsonify({'error': 'storage not available'}), 500
 
     try:
-        from data.statistics import StatisticsAnalyzer
+        from canteen_sim.data.statistics import StatisticsAnalyzer
 
 
         analyzer = StatisticsAnalyzer(storage)

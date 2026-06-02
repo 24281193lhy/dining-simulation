@@ -1,7 +1,7 @@
 # 文件: tests/test_canteen_manager.py
 
 import pytest
-from business.canteen_manager import (
+from canteen_sim.business.canteen_manager import (
     Dish, Window, Seat, Canteen, CanteenManager
 )
 
